@@ -3,6 +3,7 @@
 #STAT 685
 #Exploratory.R
 
+library(dplyr)
 
 # Read in Data from csv files
 path <- "E:/STAT685/Data/"
