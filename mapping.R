@@ -10,4 +10,6 @@ aoi_boundary_texas <- st_read(
 ggplot() + 
   geom_sf(data = aoi_boundary_texas, size = 3, color = "black", fill = "cyan1") + 
   ggtitle("AOI Boundary Plot") + 
+  geom_sf(data = aoi_boundary_texas,size=1, color = "black", fill = "cyan1") + 
+  ggtitle("Texas Schools") + 
   coord_sf()
