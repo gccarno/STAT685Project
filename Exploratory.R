@@ -8,6 +8,7 @@ library(dplyr)
 library(ggplot2)
 library(reshape2)
 library(stringr)
+library(mice) # for missing values
 
 # Read in Data from csv files
 path <- "E:/STAT685/Data/"
@@ -20,6 +21,22 @@ dfy14ea1 <- read.csv(file=paste(path, 'dfy14ea1.dat',sep=''),na.strings=c("",'.'
 dfy13ea1 <- read.csv(file=paste(path, 'dfy13ea1.csv',sep=''),na.strings=c("",'.',"NA"))
 dfy12ea1 <- read.csv(file=paste(path, 'dfy12ea1.csv',sep=''),na.strings=c("",'.',"NA"))
 
+#count missing values
+miss_19<-lapply(dfy19ea1,function(x) sum(is.na(x)))
+miss_18<-lapply(dfy18ea1,function(x) sum(is.na(x)))
+miss_17<-lapply(dfy17ea1,function(x) sum(is.na(x)))
+miss_16<-lapply(dfy16ea1,function(x) sum(is.na(x)))
+miss_15<-lapply(dfy15ea1,function(x) sum(is.na(x)))
+miss_14<-lapply(dfy14ea1,function(x) sum(is.na(x)))
+miss_13<-lapply(dfy13ea1,function(x) sum(is.na(x)))
+miss_12<-lapply(dfy12ea1,function(x) sum(is.na(x)))
+
+#make list
+l <- list(miss_19,miss_18,miss_17,miss_16,miss_15,miss_14,miss_13,miss_12)
+keys <- unique(unlist(lapply(l, names)))
+miss_all<-setNames(do.call(mapply, c(FUN=c, lapply(l, `[`, keys))), keys)
+miss_all.df<-data.frame(miss_all)
+
 #read demographic data
 dem17 <- read.csv(file=paste(path, 'district2017.dat',sep=''),na.strings=c("",'.',"NA"))
 dem16 <- read.csv(file=paste(path, 'district2016.dat',sep=''),na.strings=c("",'.',"NA"))
@@ -27,6 +44,8 @@ dem15 <- read.csv(file=paste(path, 'district2015.dat',sep=''),na.strings=c("",'.
 dem14 <- read.csv(file=paste(path, 'district2014.dat',sep=''),na.strings=c("",'.',"NA"))
 dem13 <- read.csv(file=paste(path, 'district2013.dat',sep=''),na.strings=c("",'.',"NA"))
 dem12 <- read.csv(file=paste(path, 'district2012.dat',sep=''),na.strings=c("",'.',"NA"))
+
+#count missing values
 
 #read grade 7 data - only 2 years prior
 #dfy19e7 <- read.csv(file=paste(path, 'dfy19e7.dat',sep=''),na.strings=c("",'.',"NA"))
@@ -40,12 +59,12 @@ dfy12e7 <- read.csv(file=paste(path, 'dfy12e7.csv',sep=''),na.strings=c("",'.',"
 
 #add demographics
 #do not have demographics for 19 and 18
-dfy17ea1 <- merge(dfy17ea1, dem17, by='DISTRICT')
-dfy16ea1 <- merge(dfy16ea1, dem16, by='DISTRICT')
-dfy15ea1 <- merge(dfy15ea1, dem15, by='DISTRICT')
-dfy14ea1 <- merge(dfy14ea1, dem14, by='DISTRICT')
-dfy13ea1 <- merge(dfy13ea1, dem13, by='DISTRICT')
-dfy12ea1 <- merge(dfy12ea1, dem12, by='DISTRICT')
+dfy17ea1 <- merge(dfy17ea1, dem17, by='DISTRICT',all.x=TRUE)
+dfy16ea1 <- merge(dfy16ea1, dem16, by='DISTRICT',all.x =TRUE)
+dfy15ea1 <- merge(dfy15ea1, dem15, by='DISTRICT',all.x=TRUE)
+dfy14ea1 <- merge(dfy14ea1, dem14, by='DISTRICT',all.x=TRUE)
+dfy13ea1 <- merge(dfy13ea1, dem13, by='DISTRICT',all.x=TRUE)
+dfy12ea1 <- merge(dfy12ea1, dem12, by='DISTRICT',all.x=TRUE)
 
 #convert column to factor for easier binding
 
@@ -53,6 +72,7 @@ dfy12ea1 <- merge(dfy12ea1, dem12, by='DISTRICT')
 names(dfy19ea1)[1:5] <- toupper(names(dfy19ea1[,1:5]))
 
 #add prior year scores
+#how many did not match?
 dfy19ea1 <- merge(dfy19ea1,dfy17e7[,c('DISTRICT','m_all_rs','r_all_rs','w_all_rs')],by='DISTRICT')
 dfy18ea1 <- merge(dfy18ea1,dfy16e7[,c('DISTRICT','m_all_rs','r_all_rs','w_all_rs')],by='DISTRICT')
 dfy17ea1 <- merge(dfy17ea1,dfy15e7[,c('DISTRICT','m_all_rs','r_all_rs','w_all_rs')],by='DISTRICT')
@@ -62,6 +82,7 @@ dfy14ea1 <- merge(dfy14ea1,dfy12e7[,c('DISTRICT','m_all_rs','r_all_rs','w_all_rs
 
 #concatenate by year and district?
 all_years <- bind_rows(dfy19ea1,dfy18ea1,dfy17ea1,dfy16ea1,dfy15ea1,dfy14ea1,dfy13ea1,dfy12ea1)
+
 
 # number tested
 all_years$PASSED <- apply(select(all_years, a1_all_meetsgl_nm, a1_all_approgl_nm, a1_all_mastrgl_nm), 1, sum)
@@ -85,8 +106,6 @@ sets <- list('dfy19ea1'= dfy19ea1,
 rm_50_na <- function(dat){
   return(dat[, -which(colMeans(is.na(dat)) > 0.5)])
 }
-#remove columns with greater than 50% missing values
-sets <- lapply(sets, rm_50_na)
 
 #by gender
 cols <- grep("a1_sex.*_rs", names(all_years), value=T)
@@ -320,14 +339,16 @@ plot(all_years[all_years$YEAR <= 17,c('a1_all_rs','TAXRATENUM')])
 #district size is a range, many nas, check layout across years
 #tax rate and propwlth are ranges like district, need to translate
 
-## run linear correlation for all columns against a1_all_rs
-DISTSIZE
-COMMTYPE
-PROPWLTH
-TAXRATE
-
 # create new variables
+all_years$PROPWLTHNUM<-as.numeric(gsub(",","",str_extract(all_years$PROPWLTH, "[0-9]{3},[0-9]{3}|[0-9]{1},[0-9]{3},[0-9]{3}")))
+all_years$TAXRATENUM<-as.numeric(str_extract(all_years$TAXRATE, "[0-9]{1}.[0-9]{4}"))
+
 # a1_all_d - total tested
+
+#get all _d variables as a percentage
+d_names <- grep('^(?!.*a1_all).+_d$',names(all_years),value=TRUE,perl=T)
+var_names <- paste0(d_names,'_pct')
+all_years[,var_names] <- all_years[,d_names]/all_years$a1_all_d
 
 #percentage at risk; Not risk no, no info, at risk yes
 #a1_atr[nvy]_d 
@@ -397,4 +418,95 @@ all_years$PCT_VOC <- all_years$a1_vocy_d/all_years$a1_all_d
 # transform some scale variables from the demographic data
 # what about outliers?
 # what about invalid scale?
+
+#find missing values
+miss_vals <- all_years %>%
+  group_by(YEAR) %>%
+  summarise_each(~sum(is.na(.)))
+#miss_vals.t <- t(miss_vals)
+write.csv(miss_vals,file=paste(path, 'missing_values.csv',sep=''))
+
+#find missing percentage
+miss_pct <- all_years %>%
+  group_by(YEAR) %>%
+  summarise_each(~sum(is.na(.))/n())
+#miss_vals.t <- t(miss_vals)
+write.csv(miss_pct,file=paste(path, 'missing_pct.csv',sep=''))
+
+#find variables with less than 50% missing
+val_cols<-colMeans(miss_pct[3:6,])<.5
+
+val_years_n_vars <- all_years[all_years$YEAR > 13 & all_years$YEAR < 18
+                              ,val_cols<-colMeans(miss_pct[3:6,])<.5]
+
+#what are the names?
+names(val_years_n_vars)
+
+#remove variables that are not predictive
+#remove rs variables,keep 7th grad variables though
+grep('^(?!.*m_all|r_all|w_all|a1_all).*_rs',names(val_years_n_vars),perl=T)
+#remove avg
+grep('.+_avg_.+',names(val_years_n_vars))
+#remove pct
+grep('.+_pct_.+',names(val_years_n_vars))
+#remove _nm
+grep('.+_nm$',names(val_years_n_vars))
+#remove _rm
+grep('.+_rm$',names(val_years_n_vars))
+#remove some _d variables
+grep('^(?!.*a1_all).+_d$',names(val_years_n_vars),perl=T)
+#find variables with variance equal to 0?
+grep('a1_all_docs_r',names(val_years_n_vars))
+
+bad_names_pos <- c(grep('^(?!.*m_all|r_all|w_all|a1_all).*_rs',names(val_years_n_vars),perl=T),
+                   grep('.+_avg_.+',names(val_years_n_vars)),
+                   grep('.+_pct_.+',names(val_years_n_vars)),
+                   grep('.+_nm$',names(val_years_n_vars)),
+                   grep('.+_rm$',names(val_years_n_vars)),
+                   grep('^(?!.*a1_all).+_d$',names(val_years_n_vars),perl=T),
+                   grep('a1_all_docs_r',names(val_years_n_vars)))
+
+#bad names removed
+val_years_n_vars2 <- val_years_n_vars[,-bad_names_pos]
+
+#remove missing response variables
+val_years_n_vars2 <- val_years_n_vars2[!is.na(val_years_n_vars2$a1_all_rs),]
+
+#impute missing values
+for(i in 1:ncol(val_years_n_vars2)){
+  if (is.numeric(val_years_n_vars2[,i])){
+    val_years_n_vars2[is.na(val_years_n_vars2[,i]), i] <- mean(val_years_n_vars2[,i], na.rm = TRUE)
+  }
+}
+
+#find missing values
+miss_vals_less <- val_years_n_vars2 %>%
+  group_by(YEAR) %>%
+  summarise_each(~sum(is.na(.)))
+#miss_vals.t <- t(miss_vals)
+write.csv(miss_vals_less,file=paste(path, 'missing_values_less.csv',sep=''))
+
+tempData <- mice(val_years_n_vars2,m=5,maxit=50,meth='pmm',seed=500)
+
+nrow(val_years_n_vars2)
+nrow(na.omit(val_years_n_vars))
+
+sapply(val_years_n_vars2,is.numeric)  
+numeric_cols <- val_years_n_vars2[,sapply(val_years_n_vars2,is.numeric) ]
+sapply(numeric_cols,var)
+ncol(numeric_cols)
+#first eigen vector contains a lot of info, 28% of variance
+which(abs(cov(numeric_cols)) < .001, arr.ind=TRUE)
+unique(which(abs(cov(numeric_cols)) < .001, arr.ind=TRUE)[,2])
+
+#principal componets worked before computing percentages for each column
+#used linear regression to identify singular values
+prin.comp.cols <- princomp(numeric_cols[,-which(is.na(m0$coefficients))],cor=TRUE)
+summary(prin.comp.cols)
+plot(prin.comp.cols)
+fviz_eig(prin.comp.cols)
+
+write.csv()
+#turn the count variables into percentages?
+#don't do the other ones before?
 
