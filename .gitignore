@@ -1,0 +1,14 @@
+.Rproj.user
+*.Rproj
+*.dat
+*.csv
+*.htm
+*.RData
+*.Rhistory
+STAT 685 - DIRECTED STUDIES_RPROJECT/Analysis_17.nb.html
+STAT 685 - DIRECTED STUDIES_RPROJECT/Clean_Var_Info.R
+STAT 685 - DIRECTED STUDIES_RPROJECT/Exploratory.R
+STAT 685 - DIRECTED STUDIES_RPROJECT/scrapedata.py
+Data/demo_17_variable_description.lyt.txt
+*.json
+*.html

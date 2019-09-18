@@ -1,0 +1,97 @@
+---
+title: "Percentage Passing STAAR Analysis"
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: console
+---
+
+```{r LIBRARIES, include=FALSE}
+library(dplyr)
+library(data.table)
+library(ggplot2)
+```
+
+
+### Load Data & Merge Data
+```{r}
+path <- "N:\\SanAntonio\\Dept\\Completions\\Public\\Public_PVictor\\STATS\\TAMU\\STAT 685 - DIRECTED STUDIES\\STAT 685_Git Repo\\Data\\"
+
+dfy19ea1 <- read.csv(file = paste(path, 'dfy19ea1.dat',sep=''))
+dfy17e7 <- read.csv(file = paste(path, 'dfy17e7.dat',sep=''))
+demo_17 <- fread(file = paste(path, 'district_demo_17.csv',sep=''), na.strings = '.')
+dfy17ea1 <- read.csv(file = paste(path, 'dfy17ea1.dat',sep=''))
+
+### Merge 2019 Alg1 with 2017 Demo
+dfy19ea1 <- dfy19ea1 %>% 
+  left_join(demo_17, by = c('district' = 'DISTRICT'))
+
+# dfy17ea1 <- left_join(dfy17ea1, demo_17, by = 'DISTRICT')
+```
+
+### Assess missing data
+```{r}
+rm_50_na <- function(dat){
+  return(dat[, -which(colMeans(is.na(dat)) > 0.5)])
+}
+#remove columns with greater than 50% missing values
+sets <- rm_50_na(dfy17ea1)
+```
+
+### Sum of Passes Analysis
+```{r}
+# library(dplyr)
+### select statement selects columns of interest
+### mutate with either create a new calculated column or replace one.  This script replaces it since I set it equal to the same column name
+dfy19ea1_pass <- dfy19ea1 %>% 
+  select(dname, a1_all_unsatgl_nm, a1_all_approgl_nm, a1_all_meetsgl_nm, a1_all_mastrgl_nm, a1_all_d, a1_all_docs_n, a1_all_abs_n, a1_all_oth_n) %>% 
+  mutate(a1_all_approgl_nm = a1_all_approgl_nm - a1_all_meetsgl_nm,
+         a1_all_meetsgl_nm = a1_all_meetsgl_nm - a1_all_mastrgl_nm, 
+         test_for_students_tested = (a1_all_unsatgl_nm + a1_all_approgl_nm + a1_all_meetsgl_nm + a1_all_mastrgl_nm == a1_all_d)) 
+
+### Display that all data is complete
+## When you sum() a boolean (True/False) column R sums up all the TRUE results, so I could of wrote the script, sum(dfy19ea1_pass$test_for_students_tested == T) & got the same results.
+sum(dfy19ea1_pass$test_for_students_tested)
+table(dfy19ea1_pass$test_for_students_tested)
+
+
+### Renames columns
+colnames(dfy19ea1_pass) <- c("District Name", "Didn't Meet GL - Failed", "Approaches GL - Pass", "Meets GL - Pass", "Masters GL - Pass", "Num Stu Tested", "Num Documents Submitted", "Absent Students", "Other")
+
+### Add Column for Total Pass
+dfy19ea1$TOTAL_PASS <- apply(dfy19ea1[,c("a1_all_approgl_nm", "a1_all_meetsgl_nm", "a1_all_mastrgl_nm")], 1, function(x) sum((x[1] - x[2]), (x[2] - x[3]), x[3], na.rm = T))
+
+### Normalize to # of Tests given
+dfy19ea1$TOTAL_PASS_PERC <- with(dfy19ea1, TOTAL_PASS / a1_all_d)
+```
+
+### Feature Engineering
+```{r Feature Engineering}
+dfy19ea1$STUDENT_TEACHER_RATIO <- dfy19ea1$DPETALLC / dfy19ea1$DPSTTOFC
+```
+
+
+### Data Exploration
+```{r Data Exploration}
+### Highly Right Skewed
+hist(dfy19ea1$TOTAL_PASS_PERC)
+
+ggplot(dfy19ea1) +
+  geom_point(aes(x = seq_len(nrow(dfy19ea1)), y = STUDENT_TEACHER_RATIO, color = TOTAL_PASS_PERC)) +
+  scale_colour_gradientn(colours = terrain.colors(10))
+# plot(dfy19ea1$STUDENT_TEACHER_RATIO, color = 'TOTAL_PASS_PERC')
+
+```
+
+
+### Response????
+Percentage of passing
+
+### Variables of Interest
+Using 2017 demographics data assuming it is a decent representation of the 2019.
+1. Student/Teacher Ratio
+2. 
+# Test With Previous
+1. Is there significance difference between 2015 & 2017 demographics data?
+2. Test for percentage change between 2015 to 2017.  Hypothesis test?

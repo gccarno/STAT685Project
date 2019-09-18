@@ -1,0 +1,15 @@
+diff a/mapping.R b/mapping.R	(rejected hunks)
+@@ -0,0 +1,13 @@
++### Shape file 
++
++###packages
++library(sf)
++library(ggplot2)
++
++aoi_boundary_texas <- st_read(
++  "E:/STAT685/Data/shapefile/Current_Districts.shp")
++
++ggplot() + 
++  geom_sf(data = aoi_boundary_texas, size = 3, color = "black", fill = "cyan1") + 
++  ggtitle("AOI Boundary Plot") + 
++  coord_sf()
