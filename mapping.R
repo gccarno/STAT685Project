@@ -19,7 +19,7 @@ hisp_shp <- merge(aoi_boundary_texas, hisp, by='DISTRICT_N', all.x=TRUE)
 p1<-ggplot(hisp_shp) + 
   geom_sf(size=.1, color = "black", aes(fill = DPETHISP)) + 
   ggtitle(paste0("Percentage Hispanic in 20",year)) + 
-  scale_fill_gradient(low="blue", high="red") +
+  scale_fill_gradient(low="blue", high="red", midpoint=4000) +
   coord_sf()
 p2<-ggplot(hisp_shp) + 
   geom_sf(size=.1, color = "black", aes(fill = DPETBLAP)) + 
@@ -54,6 +54,7 @@ for (year in c(12,13,14,15,16,17,18,19)){
   hisp_shp <- merge(aoi_boundary_texas, hisp, by='DISTRICT_N', all.x=TRUE)
   plot<-ggplot(hisp_shp) + 
     geom_sf(size=.5, color = "black", aes(fill = a1_all_rs)) + 
+    scale_fill_gradient(low = "green", high = "blue",limits = c(3000,6000)) +
     ggtitle(paste0("Average Scale Score Algebra I 20",year)) + 
     coord_sf()
   png(paste0(graph_path,"a1_all_rs",year,".png"), width=648, height=432)

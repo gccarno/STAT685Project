@@ -66,6 +66,9 @@ dfy14ea1 <- merge(dfy14ea1, dem14, by='DISTRICT',all.x=TRUE)
 dfy13ea1 <- merge(dfy13ea1, dem13, by='DISTRICT',all.x=TRUE)
 dfy12ea1 <- merge(dfy12ea1, dem12, by='DISTRICT',all.x=TRUE)
 
+#how many did not match?
+
+
 #convert column to factor for easier binding
 
 #upcase some names in dfy19ea1

@@ -1,0 +1,875 @@
+---
+title: "STAT685Project"
+author: "Greg Carnovale"
+date: "9/22/2019"
+output: html_document
+header-includes:
+   - \usepackage{plyr}
+   - \usepackage{dplyr}
+   - \usepackage{ggplot2}
+   - \usepackage{reshape2}
+   - \usepackage{stringr}
+   - \usepackage{MASS}
+   - \usepackage{leaps}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Read in Data
+
+Demographic data was only available for years 12 through 17
+Previous Years 7th grad test score data was only available relative to 
+the years 14 to 19. Algebra I is taken in 9th or 8th grade, so the test
+results 2 years prior are most relevant. 
+Because of these limitations the analysis was restricted to years 14 to 17. 
+All columns also did match across years. When columns did not match or 
+had too much missing data they were thrown out. 
+
+```{r setup}
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(stringr)
+library(mice) # for missing values
+
+```
+
+
+```{r plyr dplyr ggplot2 reshape2 stringr}
+
+path <- "E:/STAT685/Data/"
+dfy19ea1 <- read.csv(file=paste(path, 'dfy19ea1.dat',sep=''),na.strings=c("",'.',"NA"))
+dfy18ea1 <- read.csv(file=paste(path, 'dfy18ea1.dat',sep=''),na.strings=c("",'.',"NA"))
+dfy17ea1 <- read.csv(file=paste(path, 'dfy17ea1.dat',sep=''),na.strings=c("",'.',"NA"))
+dfy16ea1 <- read.csv(file=paste(path, 'dfy16ea1.dat',sep=''),na.strings=c("",'.',"NA"))
+dfy15ea1 <- read.csv(file=paste(path, 'dfy15ea1_dat.csv',sep=''),na.strings=c("",'.',"NA"))
+dfy14ea1 <- read.csv(file=paste(path, 'dfy14ea1.dat',sep=''),na.strings=c("",'.',"NA"))
+dfy13ea1 <- read.csv(file=paste(path, 'dfy13ea1.csv',sep=''),na.strings=c("",'.',"NA"))
+dfy12ea1 <- read.csv(file=paste(path, 'dfy12ea1.csv',sep=''),na.strings=c("",'.',"NA"))
+
+#read demographic data
+dem17 <- read.csv(file=paste(path, 'district2017.dat',sep=''),na.strings=c("",'.',"NA"))
+dem16 <- read.csv(file=paste(path, 'district2016.dat',sep=''),na.strings=c("",'.',"NA"))
+dem15 <- read.csv(file=paste(path, 'district2015.dat',sep=''),na.strings=c("",'.',"NA"))
+dem14 <- read.csv(file=paste(path, 'district2014.dat',sep=''),na.strings=c("",'.',"NA"))
+dem13 <- read.csv(file=paste(path, 'district2013.dat',sep=''),na.strings=c("",'.',"NA"))
+dem12 <- read.csv(file=paste(path, 'district2012.dat',sep=''),na.strings=c("",'.',"NA"))
+
+dfy17e7 <- read.csv(file=paste(path, 'dfy17e7.dat',sep=''),na.strings=c("",'.',"NA"))
+dfy16e7 <- read.csv(file=paste(path, 'dfy16e7.dat',sep=''),na.strings=c("",'.',"NA"))
+dfy15e7 <- read.csv(file=paste(path, 'dfy15e7_dat.csv',sep=''),na.strings=c("",'.',"NA"))
+dfy14e7 <- read.csv(file=paste(path, 'dfy14e7.dat',sep=''),na.strings=c("",'.',"NA"))
+dfy13e7 <- read.csv(file=paste(path, 'dfy13e7.csv',sep=''),na.strings=c("",'.',"NA"))
+dfy12e7 <- read.csv(file=paste(path, 'dfy12e7.csv',sep=''),na.strings=c("",'.',"NA"))
+
+dfy17ea1 <- merge(dfy17ea1, dem17, by='DISTRICT',all.x=TRUE)
+dfy16ea1 <- merge(dfy16ea1, dem16, by='DISTRICT',all.x =TRUE)
+dfy15ea1 <- merge(dfy15ea1, dem15, by='DISTRICT',all.x=TRUE)
+dfy14ea1 <- merge(dfy14ea1, dem14, by='DISTRICT',all.x=TRUE)
+dfy13ea1 <- merge(dfy13ea1, dem13, by='DISTRICT',all.x=TRUE)
+dfy12ea1 <- merge(dfy12ea1, dem12, by='DISTRICT',all.x=TRUE)
+
+names(dfy19ea1)[1:5] <- toupper(names(dfy19ea1[,1:5]))
+
+dfy19ea1 <- merge(dfy19ea1,dfy17e7[,c('DISTRICT','m_all_rs','r_all_rs','w_all_rs')],by='DISTRICT')
+dfy18ea1 <- merge(dfy18ea1,dfy16e7[,c('DISTRICT','m_all_rs','r_all_rs','w_all_rs')],by='DISTRICT')
+dfy17ea1 <- merge(dfy17ea1,dfy15e7[,c('DISTRICT','m_all_rs','r_all_rs','w_all_rs')],by='DISTRICT')
+dfy16ea1 <- merge(dfy16ea1,dfy14e7[,c('DISTRICT','m_all_rs','r_all_rs','w_all_rs')],by='DISTRICT')
+dfy15ea1 <- merge(dfy15ea1,dfy13e7[,c('DISTRICT','m_all_rs','r_all_rs','w_all_rs')],by='DISTRICT')
+dfy14ea1 <- merge(dfy14ea1,dfy12e7[,c('DISTRICT','m_all_rs','r_all_rs','w_all_rs')],by='DISTRICT')
+
+all_years <- bind_rows(dfy19ea1,dfy18ea1,dfy17ea1,dfy16ea1,dfy15ea1,dfy14ea1,dfy13ea1,dfy12ea1)
+
+```
+
+### Missing Values
+```{r}
+miss_vals <- all_years %>%
+  group_by(YEAR) %>%
+  summarise_each(~sum(is.na(.)))
+```
+
+### Missing Results
+By Year, we have a full account of each school that took the test. Demographic Data is
+missing for all schools in years 12, 18 and 19. Seventh Grade Testing Information is missing 
+from all schools in years 12 and 13 and for a few schols in the remaining years. When data is missing for a particluar school, that school will be dropped from the analysis. The response variable a1_all_rs is also missing from some years and will be dropped from that analysis. 
+```{r}
+miss_vals[,c('YEAR', 'DISTRICT','DISTNAME','m_all_rs','a1_all_rs')]
+
+```
+
+
+## Plot of the response by Year
+The overall score is increasing year over year. This can also be seen in the gif map plot. The variance over years appears to be constant. The distribution of Test scores is right skewed. There are more large outliers than small outliers. Later, the response will be transformed using box cox to account for this skew.
+```{r}
+#violin plots
+p <- ggplot(all_years, aes(x=as.factor(YEAR), y=a1_all_rs)) + 
+  geom_violin()
+p
+```
+
+## Preliminary Plots
+The initial plots give a good idea of the sign of certain predictors. Variable seleciton will be performed based upon predictors that contribute significantly to the model
+
+### 7th Grade Test scores
+```{r}
+plot(all_years[all_years$YEAR >= 14,c('a1_all_rs','m_all_rs','r_all_rs','w_all_rs')],
+     main='7th Grade Test scores Compared to Algebra I scores')
+```
+
+```{r}
+## plot vs select demographic data, only 17 and before are available
+## taxable value per pupil,number of students per teacher,%economically disadvantaged
+plot(all_years[all_years$YEAR <= 17,c('a1_all_rs','DPFVTOTK','DPSTKIDR','DPETECOP')])
+#more demos
+# total pop, number tested
+plot(all_years[all_years$YEAR <= 17,c('a1_all_rs','DPETALLC','a1_all_d')])
+#races
+#simliar result to test score boxplots
+plot(all_years[all_years$YEAR <= 17,c('a1_all_rs','DPETBLAP','DPETHISP','DPETWHIP'
+                                      ,'DPETINDP','DPETASIP','DPETPCIP','DPETTWOP')])
+#language, econ status, iq
+#econ down # English learning no effect,outliers # special ed like e^-x
+#bilingual maybe a little up, outliers
+#vocational - downard trend, outliers
+#gifted - upward trend
+plot(all_years[all_years$YEAR <= 17,c('a1_all_rs','DPETECOP','DPETLEPP','DPETSPEP'
+                                      ,'DPETBILP','DPETVOCP','DPETGIFP')])
+
+# attendance, dropout, 4yr grad, 5 yr, 6 yr, grad cnt, 
+# annual RHSP/DAP,FHSP-E etc.
+#attendance outliers, but upward trend
+# dropout outliers, but downard
+# grad rate upward, but outliers
+# grad cnt and RHSP no effect, decreasing variance
+plot(all_years[all_years$YEAR <= 17
+               ,c('a1_all_rs','DA0AT16R',
+                  'DA0912DR16R',
+                  'DAGC4X16R',
+                  'DAGC5X15R',
+                  'DAGC6X14R',
+                  'DA0GR16N',
+                  'DA0GS16N'
+               )])
+# STAAR VARIABLES
+# Upward correlation for scores, but also correlated to each other
+plot(all_years[all_years$YEAR <= 17
+               ,c('a1_all_rs','DA00A001S17R',
+                  'DA00AR01S17R',
+                  'DA00AW01S17R',
+                  'DA00AM01S17R',
+                  'DA00AC01S17R',
+                  'DA00AS01S17R',
+                  'DB00A001S17R',
+                  'DH00A001S17R',
+                  'DW00A001S17R',
+                  'DI00A001S17R',
+                  'D300A001S17R',
+                  'D400A001S17R',
+                  'D200A001S17R',
+                  'DE00A001S17R'
+               )])
+
+# college variables
+# college at/above good
+# SAT/ACT good corr., but also w/ each other
+plot(all_years[all_years$YEAR <= 17
+               ,c('a1_all_rs','DA0CT16R',
+                  'DA0CC16R',
+                  'DA0CSA16R',
+                  'DA0CAA16R'
+               )])
+#teachers total
+# no corr
+plot(all_years[all_years$YEAR <= 17
+               ,c('a1_all_rs','DPSATOFC',
+                  'DPSTTOFC'
+               )])
+
+# staff
+# no correlation
+plot(all_years[all_years$YEAR <= 17
+               ,c('a1_all_rs','DPSCTOFP',
+                  'DPSSTOFP',
+                  'DPSUTOFP',
+                  'DPSTTOFP',
+                  'DPSETOFP',
+                  'DPSXTOFP',
+                  'DPSAMIFP'
+               )])
+
+#salary
+# upward trend
+# last is teachers
+plot(all_years[all_years$YEAR <= 17
+               ,c('a1_all_rs','DPSCTOSA',
+                  'DPSSTOSA',
+                  'DPSUTOSA',
+                  'DPSTTOSA'
+               )])
+
+#teacher info
+#significant factors
+# DPST05FP
+# DPSTADFP
+# DPSTURNR - teacher turnover rate
+# DPSBLFP
+# DPSTHIFP
+# DPSTWHFP
+# DPSTREFP
+# DPSTSPFP
+plot(all_years[all_years$YEAR <= 17
+               ,c('a1_all_rs','DPSAKIDR',
+                  'DPSTKIDR',
+                  'DPST05FP',
+                  'DPSTEXPA',
+                  'DPSTADFP',
+                  'DPSTURNR',
+                  'DPSTBLFP',
+                  'DPSTHIFP',
+                  'DPSTWHFP',
+                  'DPSTO2FP',
+                  'DPSTREFP',
+                  'DPSTSPFP',
+                  'DPSTCOFP',
+                  'DPSTBIFP',
+                  'DPSTVOFP',
+                  'DPSTGOFP'
+               )])
+
+#total
+# mostly missing values
+# no trends
+foo <- all_years[all_years$YEAR <= 17
+                 ,c('a1_all_rs','DPFVTOTK',
+                    'DPFTADPR',
+                    'DPFRAALLT',
+                    'DPFRAALLK',
+                    'DPFRASTAP',
+                    'DZRVLOCP',
+                    'DPFRAFEDP',
+                    'DPFUNAB1T',
+                    'DPFUNA4T',
+                    'DPFEAALLT',
+                    'DPFEAOPFT',
+                    'DPFEAOPFK',
+                    'DPFEAINST',
+                    'DPFEAINSK'
+                 )]
+foo2 <- melt(foo, 'a1_all_rs')
+p1 <- ggplot(foo2, aes(value, a1_all_rs)) +  geom_point() + facet_grid(.~variable)
+plot(p1)
+
+#revenue
+# negative correlation with federal and state
+# positive with local
+foo <- all_years[all_years$YEAR <= 17
+                 ,c('a1_all_rs','DPFRASTAP',
+                    'DZRVLOCP',
+                    'DPFRAFEDP'
+                 )]
+foo2 <- melt(foo, 'a1_all_rs')
+p1 <- ggplot(foo2, aes(value, a1_all_rs)) +  geom_point() + facet_grid(.~variable)
+plot(p1)
+
+
+#expenditures pct 
+# some missing values removed
+# DPFPAREGP - regular 
+# DPFPACOMP - accelerated
+foo <- all_years[all_years$YEAR <= 17
+                 ,c('a1_all_rs','DPFEAINSP',
+                    'DZEXADMP',
+                    'DZEXADSP',
+                    'DZEXPLAP',
+                    'DZEXOTHP',
+                    'DPFPAREGP',
+                    'DPFPASPEP',
+                    'DPFPACOMP',
+                    'DPFPABILP',
+                    'DPFPAVOCP',
+                    'DPFPAGIFP',
+                    'DPFPAATHP',
+                    'DPFPAHSAP',
+                    'DPFPREKP',
+                    'DPFPAOTHP'
+                 )]
+foo2 <- melt(foo, 'a1_all_rs')
+p1 <- ggplot(foo2, aes(value, a1_all_rs)) +  geom_point() + facet_grid(.~variable)
+plot(p1)
+```
+
+
+### boxplot by community type
+```{r}
+ggplot(data=all_years[all_years$YEAR <= 17,],aes(x=COMMTYPE,y=a1_all_rs))+geom_boxplot()+
+theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+### District Size
+We see here that as district size increases the variance also decreases. This motivates using district size as a weighting variable.
+```{r}
+ggplot(data=all_years[all_years$YEAR <= 17,],aes(x=DISTSIZE,y=a1_all_rs))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+## reorder factor levels
+```{r}
+levels(all_years$DISTSIZE)
+all_years$DISTSIZE_reorder <- factor(all_years$DISTSIZE,levels(all_years$DISTSIZE)[c(9,8,1,2,5,6,3,4,7)])
+ggplot(data=all_years[all_years$YEAR <= 17,],aes(x=DISTSIZE_reorder,y=a1_all_rs))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+plot(all_years$a1_all_d,all_years$a1_all_rs,main="District Size Vs Average Score")
+```
+
+## Add additional factor variable for community type
+```{r}
+levels(all_years$COMMTYPE)
+new_comm_var<-model.matrix(~0+all_years$COMMTYPE)
+colnames(new_comm_var)
+gsub("-","",gsub(" ", "", levels(all_years$COMMTYPE),fixed=TRUE),fixed=TRUE)
+all_years[!(is.na(all_years$COMMTYPE)),gsub("-","",gsub(" ", "", levels(all_years$COMMTYPE),fixed=TRUE),fixed=TRUE)] <- new_comm_var
+```
+
+## Create new variables
+When a variable ends in a d it is a count. Dividing by the total number who took the test gives a percentage of each category that took the test. 
+```{r}
+all_years$PROPWLTHNUM<-as.numeric(gsub(",","",str_extract(all_years$PROPWLTH, "[0-9]{3},[0-9]{3}|[0-9]{1},[0-9]{3},[0-9]{3}")))
+all_years$TAXRATENUM<-as.numeric(str_extract(all_years$TAXRATE, "[0-9]{1}.[0-9]{4}"))
+
+#get all _d variables as a percentage
+d_names <- grep('^(?!.*a1_all).+_d$',names(all_years),value=TRUE,perl=T)
+var_names <- paste0(d_names,'_pct')
+all_years[,var_names] <- all_years[,d_names]/all_years$a1_all_d
+```
+
+## find Variables with greater than 50% missing and exclude invalid years
+Variables with greater than 50% missing cannot be imputed with the rest of the data. There are too many variables with >50% to give a full listing. A total of 2787 out of 3422 columns were removed for having > 50% missing data. Years 12, 13, 18 and 19 were excluded at this stage.
+```{r}
+#find missing percentage
+miss_pct <- all_years %>%
+  group_by(YEAR) %>%
+  summarise_each(~sum(is.na(.))/n())
+#find variables with less than 50% missing
+val_cols<-colMeans(miss_pct[3:6,])<.5
+
+val_years_n_vars <- all_years[all_years$YEAR > 13 & all_years$YEAR < 18
+                              ,val_cols<-colMeans(miss_pct[3:6,])<.5]
+ncol(all_years)
+ncol(all_years) - ncol(val_years_n_vars)
+```
+
+## Remove variables that are not predictive
+A number of variables were removed by pattern. The patterns match the following kinds of columns; average scale score when it is not the main predictor or one of the 7th grade scores, avg variables which contain average items correct in a reporting category, pct which includes percent items correct in a reporting category, nm variables which contain the number meeting performance in certain categories, rm which contains the percentage meeting performance in certain categories, some _d variables which are counts of variables which were earlier converted to percnetages. Finally a1_all_docs_r was removed because it was found to have 0 variance later in modeling and produced singular matrices.  
+
+```{r}
+#remove variables that are not predictive
+#remove rs variables,keep 7th grad variables though
+#grep('^(?!.*m_all|r_all|w_all|a1_all).*_rs',names(val_years_n_vars),perl=T)
+#remove avg
+#grep('.+_avg_.+',names(val_years_n_vars))
+#remove pct
+#grep('.+_pct_.+',names(val_years_n_vars))
+#remove _nm
+#grep('.+_nm$',names(val_years_n_vars))
+#remove _rm
+#grep('.+_rm$',names(val_years_n_vars))
+#remove some _d variables
+#grep('^(?!.*a1_all).+_d$',names(val_years_n_vars),perl=T)
+#find variables with variance equal to 0?
+#grep('a1_all_docs_r',names(val_years_n_vars))
+
+bad_names_pos <- c(grep('^(?!.*m_all|r_all|w_all|a1_all).*_rs',names(val_years_n_vars),perl=T),
+                   grep('.+_avg_.+',names(val_years_n_vars)),
+                   grep('.+_pct_.+',names(val_years_n_vars)),
+                   grep('.+_nm$',names(val_years_n_vars)),
+                   grep('.+_rm$',names(val_years_n_vars)),
+                   grep('^(?!.*a1_all).+_d$',names(val_years_n_vars),perl=T),
+                   grep('a1_all_docs_r',names(val_years_n_vars)))
+
+#bad names removed
+val_years_n_vars2 <- val_years_n_vars[,-bad_names_pos]
+```
+
+## Remove missing a1_all_rs
+49 missing values are removed at this step
+```{r}
+sum(is.na(val_years_n_vars2$a1_all_rs))
+val_years_n_vars2 <- val_years_n_vars2[!is.na(val_years_n_vars2$a1_all_rs),]
+```
+
+## Impute missing values with their mean
+Only imputing numeric values with their means. 
+```{r}
+n_miss_col = 0
+n_miss_val = 0
+#impute missing values
+for(i in 1:ncol(val_years_n_vars2)){
+  if (is.numeric(val_years_n_vars2[,i])){
+    n_miss_col = n_miss_col + 1
+    n_miss_val = n_miss_val + sum(is.na(val_years_n_vars2[,i]))
+    val_years_n_vars2[is.na(val_years_n_vars2[,i]), i] <- mean(val_years_n_vars2[,i], na.rm = TRUE)
+  }
+}
+n_miss_col
+n_miss_val
+```
+
+## Restrict data to only the numeric columns
+Restricting to only the numeric columns allows for principle components to be run.This removes 9 columns at this point. So finally we have 160 columns and 4334 observations to work with. 
+```{r}
+numeric_cols <- val_years_n_vars2[,sapply(val_years_n_vars2,is.numeric) ]
+ncol(val_years_n_vars2)
+ncol(numeric_cols)
+ncol(val_years_n_vars2) - ncol(numeric_cols)
+nrow(numeric_cols)
+```
+
+## split data into train and test
+Set a reproducible seed
+70/30 train test. 
+```{r}
+smp_size <- floor(0.70 * nrow(numeric_cols))
+set.seed(123)
+#train_ind <- sample(seq_len(nrow(numeric_cols)), size = smp_size)
+train_ind <- c(rep(1,smp_size),rep(0,nrow(numeric_cols)-smp_size))
+train_ind <- sample(train_ind)
+sum(train_ind)
+numeric_cols$train_ind <- train_ind
+```
+
+## split data for cross validation, 5 fold cross validation.
+4336/(5*150) = 5.781 observations per column
+4336/(10*150) = 2.89 observations per column
+If we restrict the model to only have a maximum of so many predictors this ratio is not as pronounced. In any case, the limited number of observations pushes me towards 5 fold cross validation over 10 fold. 
+```{r}
+smp_size_k <- ceiling(0.70 * nrow(numeric_cols))
+k_indices <- c(rep(1,smp_size_k),rep(2,smp_size_k),rep(3,smp_size_k),rep(4,smp_size_k),rep(5,smp_size_k))
+k_indices <- sample(k_indices,size=nrow(numeric_cols))
+numeric_cols$k_indices <- k_indices
+```
+
+
+## Run a prelminary model
+This preliminary model identifies columns which cause the matrix to be singular. This could have been done at an earlier stage, but this is more like an error handling method. Some would say this is not a good idea?
+variables to remove besides a1_all_d which will be used as weight
+a1_sexv_d_pct
+a1_ethv_d_pct
+a1_eco9_d_pct
+```{r}
+m0 <- lm(a1_all_rs ~ .,data=subset(numeric_cols, subset = numeric_cols$train_ind == 1, select=-c(train_ind,k_indices)))
+sing_val_coef <- which(is.na(m0$coefficients))
+#summary(m0)
+sing_val_coef
+```
+
+### remove singular values from data
+Twenty-One columns removed for causing singluar values
+```{r}
+library(knitr)
+length(sing_val_coef)
+to_rm <- names(sing_val_coef)[2:23]
+to_rm
+numeric_cols_sing_rm <- numeric_cols[,-which(names(numeric_cols) %in% to_rm)]
+ncol(numeric_cols)-ncol(numeric_cols_sing_rm)
+kable(names(sing_val_coef))
+```
+
+## Run regression again to see if more are unestimatable
+```{r}
+m0.1 <- lm(a1_all_rs ~ .,data=subset(numeric_cols_sing_rm, subset = numeric_cols_sing_rm$train_ind == 1, select=-c(train_ind,k_indices)))
+sing_val_coef.1 <- which(is.na(m0.1$coefficients))
+#summary(m0.1)
+sing_val_coef.1
+```
+
+## Run principle components
+```{r}
+prin.comp.cols <- princomp(subset(numeric_cols_sing_rm, select=-c(train_ind,k_indices,a1_all_d)),cor=TRUE)
+summary(prin.comp.cols)
+plot(prin.comp.cols)
+#cumsum()
+```
+
+##transform the predictor using box-cox
+```{r}
+library(MASS)
+library(ISLR) 
+library(leaps)
+#run 5 fold cross validation in selecting the box cox transformation
+res_k_box_cox <- rep(0,5)
+for (k in seq(1,5)){
+k_out <- (numeric_cols_sing_rm$k_indices != k)
+k_fold <- subset(numeric_cols_sing_rm,subset=k_out,select=a1_all_rs)
+ones <- rep(1, length(k_fold$a1_all_rs))
+a <- boxcox(lm(k_fold$a1_all_rs ~ ones),lambda = seq(-4, 2, 1/10))
+max_x_for_y<- function(BC){
+  with(BC, x[which.max(y)])
+}
+#plot(a)
+res_k_box_cox[k]<-max_x_for_y(a)
+}
+res_k_box_cox 
+shapiro.test(numeric_cols_sing_rm$a1_all_rs**-1.39)
+qqnorm(numeric_cols_sing_rm$a1_all_rs,main="Untransformed Normal QQ")
+qqnorm(numeric_cols_sing_rm$a1_all_rs**-1.39,main="Transformed Normal QQ")
+```
+
+## Stepwise forward selection with cross validation
+### without weights
+
+```{r}
+predict.regsubsets =function (object ,newdata ,id ,...){
+  form=as.formula (object$call [[2]])
+ mat=model.matrix (form ,newdata )
+ coefi =coef(object ,id=id)
+ xvars =names (coefi )
+ mat[,xvars ]%*% coefi
+ }
+```
+
+#things to remove
+#add this to intial removes
+```{r}
+to_remove = c(-REGION.x,-REGION.y,
+                  -a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,
+                  -a1_all_abs_r,-a1_all_oth_r)
+```
+
+#exclude region.y
+```{r}
+k=5
+cv.errors.m1 =matrix (NA ,k,70, dimnames =list(NULL , paste (1:70) ))
+for(j in 1:k){
+  k_out <- (numeric_cols_sing_rm$k_indices != j)
+  k_in <- (numeric_cols_sing_rm$k_indices == j)
+  k_fold <- subset(numeric_cols_sing_rm,subset=k_out,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r))
+  k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.y))
+  best.fit =regsubsets(a1_all_rs**-1.39∼.,data=k_fold,nvmax =70,method=c('seqrep'))
+  for(i in 1:70) {
+    pred=predict(best.fit ,k_fold_test, id=i)
+    #print(c(i,j,mean(pred)))
+    # 2384 in prediction is off
+    cv.errors.m1 [j,i]=mean( (k_fold_test$a1_all_rs-pred**(-1/1.39))^2,na.rm = TRUE)
+    }
+}
+```
+
+Forward selection lowest MSE achieved with 30 variables at 19555.03
+Forward and backward achieved the best at 36 variables with MSE 19314
+```{r}
+mean.cv.errors.no_weights.all_vars =apply(cv.errors.m1 ,2, mean)
+mean.cv.errors.no_weights.all_vars
+plot(mean.cv.errors.no_weights.all_vars ,type='b')
+which(mean.cv.errors.no_weights.all_vars==min(mean.cv.errors.no_weights.all_vars))
+```
+
+### model chosen through cross validation has 38 variables
+### build best model with 38 variables on all the data
+```{r}
+sub_model_build <- subset(numeric_cols_sing_rm,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r))
+reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('seqrep'))
+coef(reg.best,36)
+select_var <- names(coef(reg.best,36))[-1]
+```
+
+```{r}
+#select_var
+model.no_weights.all_vars <- lm(a1_all_rs**-1.39 ~ .
+             ,data=sub_model_build[,c(select_var,'a1_all_rs')])
+#m_no_weights <- lm(a1_all_rs~.,data=sub_model_no_weights)
+```
+
+### check diagnostic plots
+```{r}
+plot(model.no_weights.all_vars)
+```
+
+## see rowid outlier
+Outlier 2384
+Imagine International Acadamey of North Texas
+Lots of Asians
+```{r}
+sub_model_build['2384',]
+all_years['2384','DISTNAME']
+```
+
+### check for multicolinearity
+Really Bad multicolinearity
+```{r}
+library(car)
+vif(model.no_weights.all_vars)
+```
+
+### check that the prediction works for each variable chosen
+
+### with weights
+
+#exclude region.y
+```{r}
+k=5
+cv.errors.m2 =matrix (NA ,k,70, dimnames =list(NULL , paste (1:70) ))
+for(j in 1:k){
+  k_out <- (numeric_cols_sing_rm$k_indices != j)
+  k_in <- (numeric_cols_sing_rm$k_indices == j)
+  k_fold <- subset(numeric_cols_sing_rm,subset=k_out,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r))
+  k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-REGION.y))
+  weights <- numeric_cols_sing_rm[k_out,c("a1_all_d")]
+  best.fit =regsubsets(a1_all_rs**-1.39∼.,data=k_fold,nvmax =70,method=c('seqrep'),weights=weights)
+  for(i in 1:70) {
+    pred=predict(best.fit ,k_fold_test, id=i)
+    #print(c(i,j,mean(pred)))
+    # 2384 in prediction is off
+    cv.errors.m2 [j,i]=mean( (k_fold_test$a1_all_rs-pred**(-1/1.39))^2,na.rm = TRUE)
+    }
+}
+```
+
+33 variables, 21147.10 MSE
+```{r}
+mean.cv.errors.weights =apply(cv.errors.m2 ,2, mean)
+mean.cv.errors.weights
+plot(mean.cv.errors.weights ,type='b')
+which(mean.cv.errors.weights==min(mean.cv.errors.weights))
+```
+
+### model chosen through cross validation has 38 variables
+### build best model with 38 variables on all the data
+```{r}
+sub_model_build <- subset(numeric_cols_sing_rm,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r))
+weights <- numeric_cols_sing_rm[,c("a1_all_d")] 
+reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('seqrep'),weights=weights)
+coef(reg.best,33)
+select_var <- names(coef(reg.best,33))[-1]
+```
+
+```{r}
+#select_var
+model.weights.all_vars <- lm(a1_all_rs**-1.39 ~ .
+             ,data=sub_model_build[,c(select_var,'a1_all_rs')],weights=weights)
+#m_no_weights <- lm(a1_all_rs~.,data=sub_model_no_weights)
+```
+
+### check diagnostic plots
+No bad outliers
+```{r}
+plot(model.weights.all_vars)
+```
+
+### check for multicolinearity
+Some bad multicolinearity, esp. with race. 
+```{r}
+vif(model.weights.all_vars)
+```
+
+### remove additional variables
+#things to remove
+#add this to intial removes
+```{r}
+#remove double test scores, remove double ethnicity
+to_remove2 = c(-r_all_rs,-w_all_rs,-DZCAMPUS,-DPETBLAP,-DPETHISP,-DPETWHIP,-DPETINDP,
+-DPETASIP,-DPETPCIP,-DPETTWOP,-DPETBILP,-DPSTTOFC,-DPFEAOPFT,-DPFEAINST
+)
+#variables in third round
+```
+
+Using forward selection
+It gave more interpretable estimates
+```{r}
+k=5
+cv.errors.m3 =matrix (NA ,k,70, dimnames =list(NULL , paste (1:70) ))
+for(j in 1:k){
+  k_out <- (numeric_cols_sing_rm$k_indices != j)
+  k_in <- (numeric_cols_sing_rm$k_indices == j)
+  k_fold <- subset(numeric_cols_sing_rm,subset=k_out,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r,-r_all_rs,-w_all_rs,-DZCAMPUS,-DPETBLAP,-DPETHISP,-DPETWHIP,-DPETINDP,
+-DPETASIP,-DPETPCIP,-DPETTWOP,-DPETBILP,-DPSTTOFC,-DPFEAOPFT,-DPFEAINST,
+-DPETALLC,-DPETECOP,-DPETLEPP,-DPSATOFC,-DPSAMIFP))
+  k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-REGION.y))
+  weights <- numeric_cols_sing_rm[k_out,c("a1_all_d")]
+  best.fit =regsubsets(a1_all_rs**-1.39∼.,data=k_fold,nvmax =70,method=c('forward'),weights=weights)
+  for(i in 1:70) {
+    pred=predict(best.fit ,k_fold_test, id=i)
+    #print(c(i,j,mean(pred)))
+    # 2384 in prediction is off
+    cv.errors.m3 [j,i]=mean( (k_fold_test$a1_all_rs-pred**(-1/1.39))^2,na.rm = TRUE)
+    }
+}
+```
+
+#MSE 
+Foward , 21614.35 MSE. The diagnostic plot shows a strong outlier.
+Sequential, 21380.49
+```{r}
+mean.cv.errors.limited.weights =apply(cv.errors.m3 ,2, mean)
+mean.cv.errors.limited.weights
+plot(mean.cv.errors.limited.weights ,type='b')
+which(mean.cv.errors.limited.weights==min(mean.cv.errors.limited.weights))
+```
+
+Removed Extra econ variables for high vif
+```{r}
+sub_model_build <- subset(numeric_cols_sing_rm,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r,-a1_all_abs_r,-a1_all_oth_r,-r_all_rs,-w_all_rs,-DZCAMPUS,-DPETBLAP,-DPETHISP,-DPETWHIP,-DPETINDP,
+-DPETASIP,-DPETPCIP,-DPETTWOP,-DPETBILP,-DPSTTOFC,-DPFEAOPFT,-DPFEAINST,
+-DPETALLC,-DPETECOP,-DPETLEPP,-DPSATOFC,-DPSAMIFP,-DPFRAALLT,-DPFEAALLT))
+weights <- numeric_cols_sing_rm[,c("a1_all_d")] 
+reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('forward'),weights=weights)
+coef(reg.best,13)
+select_var <- names(coef(reg.best,13))[-1]
+```
+
+```{r}
+#select_var
+m3.limited.weights <- lm(a1_all_rs**-1.39 ~ .
+             ,data=sub_model_build[,c(select_var,'a1_all_rs')],weights=weights)
+#m_no_weights <- lm(a1_all_rs~.,data=sub_model_no_weights)
+```
+
+## check the limited variable model without weights and compare MSE.
+
+
+### check diagnostic plots
+Some far outliers, 
+
+```{r}
+plot(m3.limited.weights)
+```
+
+##check one outlier
+This is Houston. It is humongous
+```{r}
+all_years['2667','DISTNAME']
+```
+
+### check for multicolinearity
+Restricted to forward selection. In stepwise there was bad multicolinearity.
+This model confirms many of our pre-existing assumptions. It is good from that perspective.
+```{r}
+vif(m3.limited.weights)
+```
+
+```{r}
+#variables in third round
+#additiona variables that duplicate information
+to_remove3 = c(-DPETALLC,-DPETECOP,-DPETLEPP,-DPSATOFC,-DPSAMIFP,
+)
+```
+
+## Check the limited variable model without weights and compare
+```{r}
+k=5
+cv.errors.m4 =matrix (NA ,k,70, dimnames =list(NULL , paste (1:70) ))
+for(j in 1:k){
+  k_out <- (numeric_cols_sing_rm$k_indices != j)
+  k_in <- (numeric_cols_sing_rm$k_indices == j)
+  k_fold <- subset(numeric_cols_sing_rm,subset=k_out,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r,-r_all_rs,-w_all_rs,-DZCAMPUS,-DPETBLAP,-DPETHISP,-DPETWHIP,-DPETINDP,
+-DPETASIP,-DPETPCIP,-DPETTWOP,-DPETBILP,-DPSTTOFC,-DPFEAOPFT,-DPFEAINST,
+-DPETALLC,-DPETECOP,-DPETLEPP,-DPSATOFC,-DPSAMIFP))
+  k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-REGION.y))
+  weights <- numeric_cols_sing_rm[k_out,c("a1_all_d")]
+  best.fit =regsubsets(a1_all_rs**-1.39∼.,data=k_fold,nvmax =70,method=c('seqrep'))
+  for(i in 1:70) {
+    pred=predict(best.fit ,k_fold_test, id=i)
+    #print(c(i,j,mean(pred)))
+    # 2384 in prediction is off
+    cv.errors.m4 [j,i]=mean( (k_fold_test$a1_all_rs-pred**(-1/1.39))^2,na.rm = TRUE)
+    }
+}
+```
+
+Lowest was at 60, 19753.
+```{r}
+mean.cv.errors.noweights.limited =apply(cv.errors.m4 ,2, mean)
+mean.cv.errors.noweights.limited
+plot(mean.cv.errors.noweights.limited ,type='b')
+which(mean.cv.errors.noweights.limited==min(mean.cv.errors.noweights.limited))
+```
+
+## without weights 32 variable model selected, w/ limited data
+```{r}
+sub_model_build <- subset(numeric_cols_sing_rm,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r,-a1_all_abs_r,-a1_all_oth_r,-r_all_rs,-w_all_rs,-DZCAMPUS,-DPETBLAP,-DPETHISP,-DPETWHIP,-DPETINDP,
+-DPETASIP,-DPETPCIP,-DPETTWOP,-DPETBILP,-DPSTTOFC,-DPFEAOPFT,-DPFEAINST,
+-DPETALLC,-DPETECOP,-DPETLEPP,-DPSATOFC,-DPSAMIFP))
+#weights <- numeric_cols_sing_rm[,c("seqrep")] 
+reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('seqrep'))
+coef(reg.best,60)
+select_var <- names(coef(reg.best,60))[-1]
+```
+
+```{r}
+#select_var
+m4.noweights.limited <- lm(a1_all_rs**-1.39 ~ .
+             ,data=sub_model_build[,c(select_var,'a1_all_rs')])
+#m_no_weights <- lm(a1_all_rs~.,data=sub_model_no_weights)
+```
+
+## check the limited variable model without weights and compare MSE.
+
+
+### check diagnostic plots
+```{r}
+plot(m4.noweights.limited)
+```
+
+### check for multicolinearity
+
+```{r}
+vif(m4.noweights.limited)
+```
+
+#compare MSE from the three models
+Comparison of MSE from the three techniques of choosing a model.
+This is not coming out how I like.
+```{r}
+
+plot_mse <- data.frame(cbind(seq(1,70),mean.cv.errors.no_weights.all_vars,mean.cv.errors.weights,
+                                 mean.cv.errors.limited.weights, mean.cv.errors.noweights.limited))
+
+ggplot(plot_mse) +
+  geom_line(aes(x=V1,y=mean.cv.errors.no_weights.all_vars,colour="No Weights")) +
+  geom_line(aes(x=V1,y=mean.cv.errors.weights,colour='Weights')) +
+  geom_line(aes(x=V1,y=mean.cv.errors.limited.weights,colour='Weights + Limited Vars')) +
+  geom_line(aes(x=V1,y=mean.cv.errors.noweights.limited,colour='No Weights + Limited Vars')) +
+  ggtitle("Mean Cross Validation Error with 5 Folds")
+```
+
+Compare diagnostics from the different models
+```{r}
+```
+
+## lasso model
+## should try elastic net
+Trying without weights first. Run on train test split
+```{r}
+library(glmnet)
+#cv.glmnet
+set.seed(1011)
+X <- as.matrix(subset(numeric_cols_sing_rm,subset = (numeric_cols_sing_rm$train_ind == 1) ,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r -a1_all_rs)))
+y <- numeric_cols_sing_rm[(numeric_cols_sing_rm$train_ind == 1),'a1_all_rs']**-1.39
+#without weights
+elastic_net <- cv.glmnet(X,y,nfolds = 5)
+summary(elastic_net)
+plot(elastic_net)
+coef(elastic_net)
+bestlam =elastic_net$lambda.min
+X_test <- X <- as.matrix(subset(numeric_cols_sing_rm,subset = (numeric_cols_sing_rm$train_ind == 0) ,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r -a1_all_rs)))
+res.lasso <- predict(elastic_net,X_test,type ="coefficients",s=bestlam)
+res.lasso
+```
+
+Trying with weights first
+
+## test via correlation
+
+### Random Forest
+
+### XG Boost
+
+```{r}
+library(xgboost)
+```
+
+

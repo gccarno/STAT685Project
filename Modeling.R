@@ -3,6 +3,7 @@
 library(MASS)
 library(ISLR) #should be using leaps?
 library(leaps)
+library(car) # for vif
 
 ## Variables to consider
 ## 
@@ -135,10 +136,10 @@ m3.p <- predict(m3,test_na_rm)
 m4.p <- predict(m4,test_na_rm)
 
 #MSEPE
-mean((m0.p-test_na_rm$a1_all_rs)**2)
-mean((m1.p-test_na_rm$a1_all_rs)**2)
-mean((m3.p**(-1/1.636)-test_na_rm$a1_all_rs)**2)
-mean((m4.p**(-1/1.636)-test_na_rm$a1_all_rs)**2)
+mspe1<-mean((m0.p-test_na_rm$a1_all_rs)**2)
+mspe2<-mean((m1.p-test_na_rm$a1_all_rs)**2)
+mspe3<-mean((m3.p**(-1/1.636)-test_na_rm$a1_all_rs)**2)
+mspe4<-mean((m4.p**(-1/1.636)-test_na_rm$a1_all_rs)**2)
 
 #large matrix
 ##singluarities produced by some variables
@@ -170,10 +171,10 @@ par(mfrow=c(2,2))
 plot(m0)
 
 #predict
-m0.p <- predict(m0,test_na_rm)
+m0.p <- predict(m0,test)
 
 #MSE
-mean((m0.p-test_na_rm$a1_all_rs)**2)
+mean((m0.p-test$a1_all_rs)**2)
 
 
 
@@ -190,6 +191,14 @@ m1.num <- lm(a1_all_rs ~ .,data=train[,-which(names(train) %in% sing_val_coef2)]
 summary(m1.num)
 par(mfrow=c(2,2))
 plot(m1.num)
+
+#predict
+m1.p <- predict(m1.num,test)
+
+#MSE
+mean((m1.p-test$a1_all_rs)**2)
+m1.p[1:10]
+test$a1_all_rs[1:10]
 
 ## getting perfect corelation, investigate
 
@@ -213,13 +222,102 @@ plot(regfit.full)
 
 regfit.full=regsubsets(a1_all_rs**-1.636~.
                        ,data=train[,-which(names(train) %in% sing_val_coef2)]
-                       ,nvmax=70,weights=train$a1_all_d,method=c('forward'))
+                       ,nvmax=80,weights=train$a1_all_d,method=c('forward'))
 reg.summary=(summary(regfit.full))
 plot(reg.summary$bic ,xlab =" Number of Variables ",
      ylab=" Adjusted RSq",type="l")
 which.min (reg.summary$bic )
+which.max (reg.summary$adjr2 )
+max(reg.summary$adjr2)
 par(mfrow=c(1,1))
 plot(regfit.full)
+coef(regfit.full,41)
+names(coef(regfit.full,41))
+#transform back
+sapply(coef(regfit.full,41), function(x) sign(x)*abs(x)**(1/-1.636))
+
+#find the models
+good_vars <- c(names(coef(regfit.full,41))[-1],'a1_all_rs')
+# run again without the bad coefficients
+m2.num <- lm(a1_all_rs**-1.636 ~ .
+             ,data=train[,good_vars]
+             ,weights=train$a1_all_d)
+summary(m2.num)
+par(mfrow=c(2,2))
+plot(m2.num)
+
+m2.num.p <- predict(m2.num,test)
+par(mfrow=c(1,1))
+plot(test$a1_all_rs,m2.num.p**(-1/1.636))
+
+#test MSE
+test.mat=model.matrix (a1_all_rs**-1.636~.
+                       ,data=test[,-which(names(train) %in% sing_val_coef2)]
+                       ,weights=test$a1_all_d)
+val.errors =rep(NA ,80)
+for(j in 1:80){
+  coefi=coef(regfit.full,id=j)
+  pred=test.mat[,names(coefi)]%*%coefi
+  val.errors[j]=mean((pred**(-1/1.63)-test$a1_all_rs)**2)
+}
+val.errors
+test$a1_all_rs[1:10]
+pred[1:10]**(-1/1.63)
+
+#what about from m2
+#predict
+m2.num.p <- predict(m2.num,test)
+mean((m2.num.p**(-1/1.636)-test$a1_all_rs)**2)
+
+#find the models
+good_vars <- c(names(coef(regfit.full,22))[-1],'a1_all_rs')
+# run again without the bad coefficients
+m3.num <- lm(a1_all_rs**-1.636 ~ .
+             ,data=train[,good_vars]
+             ,weights=train$a1_all_d)
+summary(m3.num)
+par(mfrow=c(2,2))
+plot(m3.num)
+
+m3.num.p <- predict(m3.num,test)
+mean((m3.num.p**(-1/1.636)-test$a1_all_rs)**2)
+
+##what if I don't use the weights?
+##the weights appear to have a worse effect on MSPE
+regfit.full.noweight=regsubsets(a1_all_rs**-1.636~.
+                       ,data=train[,-which(names(train) %in% sing_val_coef2)]
+                       ,nvmax=80,method=c('forward'))
+#test MSE
+test.mat=model.matrix (a1_all_rs**-1.636~.
+                       ,data=test[,-which(names(train) %in% sing_val_coef2)])
+val.errors =rep(NA ,80)
+for(j in 1:80){
+  coefi=coef(regfit.full.noweight,id=j)
+  pred=test.mat[,names(coefi)]%*%coefi
+  val.errors[j]=mean((pred**(-1/1.63)-test$a1_all_rs)**2)
+}
+val.errors
+which(val.errors==min(val.errors))
+
+#find the models
+good_vars <- c(names(coef(regfit.full.noweight,35))[-1],'a1_all_rs')
+# run again without the bad coefficients
+m4.num <- lm(a1_all_rs**-1.636 ~ .
+             ,data=train[,good_vars])
+summary(m4.num)
+par(mfrow=c(2,2))
+plot(m4.num)
+
+vif(m4.num)
+
+m4.num.p <- predict(m4.num,test)
+par(mfrow=c(1,1))
+plot(test$a1_all_rs,m4.num.p**(-1/1.636))
+
+mean((m4.num.p**(-1/1.636)-test$a1_all_rs)**2)
+
+#coefficients
+sign(coef(regfit.full.noweight,35))*abs(coef(regfit.full.noweight,35))**(-1/1.636)
 
 ## Unweighted
 
