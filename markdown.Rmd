@@ -364,7 +364,7 @@ ncol(all_years) - ncol(val_years_n_vars)
 ```
 
 ## Remove variables that are not predictive
-A number of variables were removed by pattern. The patterns match the following kinds of columns; average scale score when it is not the main predictor or one of the 7th grade scores, avg variables which contain average items correct in a reporting category, pct which includes percent items correct in a reporting category, nm variables which contain the number meeting performance in certain categories, rm which contains the percentage meeting performance in certain categories, some _d variables which are counts of variables which were earlier converted to percnetages. Finally a1_all_docs_r was removed because it was found to have 0 variance later in modeling and produced singular matrices.  
+A number of variables were removed by pattern. The patterns match the following kinds of columns; average scale score when it is not the main predictor or one of the 7th grade scores, avg variables which contain average items correct in a reporting category, pct which includes percent items correct in a reporting category, nm variables which contain the number meeting performance in certain categories, rm which contains the percentage meeting performance in certain categories, some _d variables which are counts of variables which were earlier converted to percnetages. Finally a1_all_docs_r was removed because it was found to have 0 variance later in modeling and produced singular matrices. Racial variables which were repeated in the test and demographic data were removed. 
 
 ```{r}
 #remove variables that are not predictive
@@ -383,16 +383,55 @@ A number of variables were removed by pattern. The patterns match the following 
 #find variables with variance equal to 0?
 #grep('a1_all_docs_r',names(val_years_n_vars))
 
+
+#racial and economic variables that are repeated in the numbers that took the test
+racial_repeats <- c('DPETBLAP',
+'DPETHISP',
+'DPETWHIP',
+'DPETINDP',
+'DPETASIP',
+'DPETPCIP',
+'DPETTWOP'
+)
+#grep('DPET.+',names(val_years_n_vars),perl=T,value=T)
+#missing categories
+#grep('a1_.+v_d.+',names(val_years_n_vars),perl=T,value=T)
+#no to a particular category
+#grep('a1_.+n_d.+',names(val_years_n_vars),perl=T,value=T)
+#yes to some categories with multiple letters
+yes_cat <- 'a1_bily_d|a1_ecoy_d|a1_esly_d|a1_ti1y_d|a1_vocy_d|a1_esbiy_d_pct'
+#grep(yes_cat,names(val_years_n_vars),value=T)
+#categories not thought as predictive
+no_pre <- 'Region.X|Region.Y|a1_all_docs_n|a1_all_abs_n|a1_all_oth_n|a1_all_abs_r|a1_all_oth_r|DZCAMPUS|Rural'
+#grep(no_pre,names(val_years_n_vars),value=T)
+
 bad_names_pos <- c(grep('^(?!.*m_all|r_all|w_all|a1_all).*_rs',names(val_years_n_vars),perl=T),
                    grep('.+_avg_.+',names(val_years_n_vars)),
                    grep('.+_pct_.+',names(val_years_n_vars)),
                    grep('.+_nm$',names(val_years_n_vars)),
                    grep('.+_rm$',names(val_years_n_vars)),
-                   grep('^(?!.*a1_all).+_d$',names(val_years_n_vars),perl=T),
-                   grep('a1_all_docs_r',names(val_years_n_vars)))
+  grep('a1_.+v_d.+',names(val_years_n_vars),perl=T),           
+  grep('DPET.+',names(val_years_n_vars),perl=T),
+  grep('^(?!.*a1_all).+_d$',names(val_years_n_vars),perl=T),
+  grep('a1_all_docs_r',names(val_years_n_vars)),
+  grep('a1_.+n_d.+',names(val_years_n_vars),perl=T),
+  grep(yes_cat,names(val_years_n_vars)),
+  grep(no_pre,names(val_years_n_vars)))
+
+#no to a particular category
+
+#yes categories
+
+#categories that do not make sense
 
 #bad names removed
 val_years_n_vars2 <- val_years_n_vars[,-bad_names_pos]
+
+#additional variables to remove for logical reasons
+
+#racial variables that are repeated in the numbers that took the test
+
+
 ```
 
 ## Remove missing a1_all_rs
@@ -432,6 +471,7 @@ nrow(numeric_cols)
 ## split data into train and test
 Set a reproducible seed
 70/30 train test. 
+60/20/20 train, test, validate
 ```{r}
 smp_size <- floor(0.70 * nrow(numeric_cols))
 set.seed(123)
@@ -440,6 +480,17 @@ train_ind <- c(rep(1,smp_size),rep(0,nrow(numeric_cols)-smp_size))
 train_ind <- sample(train_ind)
 sum(train_ind)
 numeric_cols$train_ind <- train_ind
+
+spec = c(train = .6, test = .2, validate = .2)
+g = sample(cut(
+  seq(nrow(numeric_cols)), 
+  nrow(numeric_cols)*cumsum(c(0,spec)),
+  labels = names(spec)
+))
+frame_split = split(numeric_cols, g)
+
+sapply(frame_split, nrow)/nrow(numeric_cols)
+
 ```
 
 ## split data for cross validation, 5 fold cross validation.
@@ -461,7 +512,8 @@ a1_sexv_d_pct
 a1_ethv_d_pct
 a1_eco9_d_pct
 ```{r}
-m0 <- lm(a1_all_rs ~ .,data=subset(numeric_cols, subset = numeric_cols$train_ind == 1, select=-c(train_ind,k_indices)))
+#m0 <- lm(a1_all_rs ~ .,data=subset(numeric_cols, subset = numeric_cols$train_ind == 1, select=-c(train_ind,k_indices)))
+m0 <- lm(a1_all_rs**-1.39 ~ ., data=frame_split$train)
 sing_val_coef <- which(is.na(m0$coefficients))
 #summary(m0)
 sing_val_coef
@@ -473,10 +525,16 @@ Twenty-One columns removed for causing singluar values
 library(knitr)
 length(sing_val_coef)
 to_rm <- names(sing_val_coef)[2:23]
-to_rm
-numeric_cols_sing_rm <- numeric_cols[,-which(names(numeric_cols) %in% to_rm)]
-ncol(numeric_cols)-ncol(numeric_cols_sing_rm)
-kable(names(sing_val_coef))
+#to_rm
+if (length(sing_val_coef) > 1){
+  numeric_cols_sing_rm <- numeric_cols[,-which(names(numeric_cols) %in% to_rm)]
+} else {
+  numeric_cols_sing_rm <- numeric_cols
+}
+#removed the singular columns before
+
+#ncol(numeric_cols)-ncol(numeric_cols_sing_rm)
+#kable(names(sing_val_coef))
 ```
 
 ## Run regression again to see if more are unestimatable
@@ -489,11 +547,22 @@ sing_val_coef.1
 
 ## Run principle components
 ```{r}
-prin.comp.cols <- princomp(subset(numeric_cols_sing_rm, select=-c(train_ind,k_indices,a1_all_d)),cor=TRUE)
+#prin.comp.cols <- princomp(subset(numeric_cols_sing_rm, select=-c(train_ind,k_indices,a1_all_d)),cor=TRUE)
+prin.comp.cols <- princomp(subset(frame_split$train, select=-c(a1_all_d)),cor=TRUE)
 summary(prin.comp.cols)
 plot(prin.comp.cols)
+
 #cumsum()
 ```
+```{r}
+#plot first two principal components colored by a1_all_rs
+#ggplot(prin.comp.cols$loadings[,1],prin.comp.cols$loadings[,1],colour=frame_split$train$a1_all_rs)
+#biplot(prin.comp.cols)
+prin_comp_frame <- data.frame(cbind(prin.comp.cols$scores[,1:2],frame_split$train$a1_all_rs))
+p <- ggplot(prin_comp_frame,aes(Comp.1, Comp.2))
+p + geom_point(aes(colour = V3))
+```
+
 
 ##transform the predictor using box-cox
 ```{r}
@@ -542,13 +611,14 @@ to_remove = c(-REGION.x,-REGION.y,
 
 #exclude region.y
 ```{r}
-k=5
+k=10
+folds=sample (1:k,nrow(frame_split$train),replace =TRUE)
 cv.errors.m1 =matrix (NA ,k,70, dimnames =list(NULL , paste (1:70) ))
 for(j in 1:k){
-  k_out <- (numeric_cols_sing_rm$k_indices != j)
-  k_in <- (numeric_cols_sing_rm$k_indices == j)
-  k_fold <- subset(numeric_cols_sing_rm,subset=k_out,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r))
-  k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.y))
+  #k_out <- (numeric_cols_sing_rm$k_indices != j)
+  #k_in <- (numeric_cols_sing_rm$k_indices == j)
+  k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-a1_all_d,-REGION.x,-REGION.y))
+  k_fold_test <- subset(frame_split$train,subset=(folds==j),select=c(-a1_all_d,-REGION.y))
   best.fit =regsubsets(a1_all_rs**-1.39∼.,data=k_fold,nvmax =70,method=c('seqrep'))
   for(i in 1:70) {
     pred=predict(best.fit ,k_fold_test, id=i)
@@ -560,21 +630,23 @@ for(j in 1:k){
 ```
 
 Forward selection lowest MSE achieved with 30 variables at 19555.03
-Forward and backward achieved the best at 36 variables with MSE 19314
+Forward and backward achieved the best at 35 variables with MSE 19521
+foward and backware on train/test/val, with 26 variables with MSE 19491.63, but this was on less data
 ```{r}
 mean.cv.errors.no_weights.all_vars =apply(cv.errors.m1 ,2, mean)
 mean.cv.errors.no_weights.all_vars
 plot(mean.cv.errors.no_weights.all_vars ,type='b')
 which(mean.cv.errors.no_weights.all_vars==min(mean.cv.errors.no_weights.all_vars))
+mean.cv.errors.no_weights.all_vars[which(mean.cv.errors.no_weights.all_vars==min(mean.cv.errors.no_weights.all_vars))]
 ```
 
 ### model chosen through cross validation has 38 variables
 ### build best model with 38 variables on all the data
 ```{r}
-sub_model_build <- subset(numeric_cols_sing_rm,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r))
+sub_model_build <- subset(frame_split$test,select=c(-a1_all_d,-REGION.x,-REGION.y))
 reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('seqrep'))
-coef(reg.best,36)
-select_var <- names(coef(reg.best,36))[-1]
+coef(reg.best,26)
+select_var <- names(coef(reg.best,26))[-1]
 ```
 
 ```{r}
@@ -596,6 +668,8 @@ Lots of Asians
 ```{r}
 sub_model_build['2384',]
 all_years['2384','DISTNAME']
+all_years['5930','DISTNAME']
+all_years['4835','DISTNAME']
 ```
 
 ### check for multicolinearity
@@ -610,41 +684,47 @@ vif(model.no_weights.all_vars)
 ### with weights
 
 #exclude region.y
+mess around with sqrt weights
 ```{r}
-k=5
+k=10
+folds=sample (1:k,nrow(frame_split$train),replace =TRUE)
 cv.errors.m2 =matrix (NA ,k,70, dimnames =list(NULL , paste (1:70) ))
 for(j in 1:k){
-  k_out <- (numeric_cols_sing_rm$k_indices != j)
-  k_in <- (numeric_cols_sing_rm$k_indices == j)
-  k_fold <- subset(numeric_cols_sing_rm,subset=k_out,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r))
-  k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-REGION.y))
-  weights <- numeric_cols_sing_rm[k_out,c("a1_all_d")]
+  #k_out <- (numeric_cols_sing_rm$k_indices != j)
+  #k_in <- (numeric_cols_sing_rm$k_indices == j)
+  k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-a1_all_d,-REGION.x,-REGION.y))
+  k_fold_test <- subset(frame_split$train,subset=(folds==j),select=c(-a1_all_d,-REGION.y))
+  weights <- sqrt(frame_split$train[(folds!=j),c("a1_all_d")])
   best.fit =regsubsets(a1_all_rs**-1.39∼.,data=k_fold,nvmax =70,method=c('seqrep'),weights=weights)
   for(i in 1:70) {
     pred=predict(best.fit ,k_fold_test, id=i)
     #print(c(i,j,mean(pred)))
     # 2384 in prediction is off
-    cv.errors.m2 [j,i]=mean( (k_fold_test$a1_all_rs-pred**(-1/1.39))^2,na.rm = TRUE)
+    cv.errors.m2[j,i]=mean( (k_fold_test$a1_all_rs-pred**(-1/1.39))^2,na.rm = TRUE)
     }
 }
 ```
 
-33 variables, 21147.10 MSE
+40 variables, 21331.15 MSE
+on train/test/val, 30 variable model mse 21386.9, but on less data and 10 fold val
+sqrt weights, 42 is best, but graph shows around 21 is enough 19538 MSE
 ```{r}
 mean.cv.errors.weights =apply(cv.errors.m2 ,2, mean)
 mean.cv.errors.weights
 plot(mean.cv.errors.weights ,type='b')
 which(mean.cv.errors.weights==min(mean.cv.errors.weights))
+mean.cv.errors.weights[which(mean.cv.errors.weights==min(mean.cv.errors.weights))]
 ```
 
 ### model chosen through cross validation has 38 variables
 ### build best model with 38 variables on all the data
+variables better with sqrt weights
 ```{r}
-sub_model_build <- subset(numeric_cols_sing_rm,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r))
-weights <- numeric_cols_sing_rm[,c("a1_all_d")] 
+sub_model_build <- subset(frame_split$test,select=c(-a1_all_d,-REGION.x,-REGION.y))
+weights <- sqrt(frame_split$test[,c("a1_all_d")])
 reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('seqrep'),weights=weights)
-coef(reg.best,33)
-select_var <- names(coef(reg.best,33))[-1]
+coef(reg.best,21)
+select_var <- names(coef(reg.best,21))[-1]
 ```
 
 ```{r}
@@ -656,14 +736,27 @@ model.weights.all_vars <- lm(a1_all_rs**-1.39 ~ .
 
 ### check diagnostic plots
 No bad outliers
+esp. with sqrt weights
 ```{r}
 plot(model.weights.all_vars)
+```
+
+##check outliers
+```{r}
+all_years['2667','DISTNAME']
+all_years['2384','DISTNAME']
+all_years['6440','DISTNAME']
+all_years['5989','DISTNAME']
 ```
 
 ### check for multicolinearity
 Some bad multicolinearity, esp. with race. 
 ```{r}
-vif(model.weights.all_vars)
+m_weights<-vif(model.weights.all_vars)
+m_weights
+which(m_weights>7)
+co_lin_vars<-names(which(m_weights>7))
+paste(co_lin_vars,sep='-,',collapse = ',-')
 ```
 
 ### remove additional variables
@@ -671,25 +764,30 @@ vif(model.weights.all_vars)
 #add this to intial removes
 ```{r}
 #remove double test scores, remove double ethnicity
-to_remove2 = c(-r_all_rs,-w_all_rs,-DZCAMPUS,-DPETBLAP,-DPETHISP,-DPETWHIP,-DPETINDP,
--DPETASIP,-DPETPCIP,-DPETTWOP,-DPETBILP,-DPSTTOFC,-DPFEAOPFT,-DPFEAINST
-)
+#to_remove2 = c(-r_all_rs,-w_all_rs,-DZCAMPUS,-DPETBLAP,-DPETHISP,-DPETWHIP,-DPETINDP,
+#-DPETASIP,-DPETPCIP,-DPETTWOP,-DPETBILP,-DPSTTOFC,-DPFEAOPFT,-DPFEAINST
+#)
+
 #variables in third round
+#DPFEAALLT, DPFEAINST
 ```
 
 Using forward selection
 It gave more interpretable estimates
+trying with sqrt weights and some multicolinear removed
 ```{r}
-k=5
+k=10
+folds=sample (1:k,nrow(frame_split$train),replace =TRUE)
 cv.errors.m3 =matrix (NA ,k,70, dimnames =list(NULL , paste (1:70) ))
 for(j in 1:k){
-  k_out <- (numeric_cols_sing_rm$k_indices != j)
-  k_in <- (numeric_cols_sing_rm$k_indices == j)
-  k_fold <- subset(numeric_cols_sing_rm,subset=k_out,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r,-r_all_rs,-w_all_rs,-DZCAMPUS,-DPETBLAP,-DPETHISP,-DPETWHIP,-DPETINDP,
--DPETASIP,-DPETPCIP,-DPETTWOP,-DPETBILP,-DPSTTOFC,-DPFEAOPFT,-DPFEAINST,
--DPETALLC,-DPETECOP,-DPETLEPP,-DPSATOFC,-DPSAMIFP))
-  k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-REGION.y))
-  weights <- numeric_cols_sing_rm[k_out,c("a1_all_d")]
+  #k_out <- (numeric_cols_sing_rm$k_indices != j)
+  #k_in <- (numeric_cols_sing_rm$k_indices == j)
+  #k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-a1_all_d,-REGION.x,-REGION.y))
+  k_fold_test <- subset(frame_split$train,subset=(folds==j),select=c(-a1_all_d,-REGION.y))
+  #k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPSATOFC,-DPSTTOFC,-DPSCTOFP,-DPSSTOFP,-DPSUTOFP,-DPSTTOFP,-DPSETOFP,-DPSXTOFP,-DPSAMIFP,-DPSAKIDR,-DPSTKIDR,-DPST05FP,-DPSTEXPA,-DPSTBLFP,-DPSTHIFP,-DPSTWHFP,-DPSTO2FP,-DPSTREFP,-DPSTSPFP,-DPSTCOFP,-DPSTBIFP,-DPSTVOFP,-DPSTGOFP,-DPFRAALLT,-DPFRASTAP,-DZRVLOCP,-DPFRAFEDP,-DPFEAALLT, -DPFEAINST))
+  k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+  #k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-REGION.y))
+  weights <- sqrt(frame_split$train[(folds!=j),c("a1_all_d")])
   best.fit =regsubsets(a1_all_rs**-1.39∼.,data=k_fold,nvmax =70,method=c('forward'),weights=weights)
   for(i in 1:70) {
     pred=predict(best.fit ,k_fold_test, id=i)
@@ -701,24 +799,29 @@ for(j in 1:k){
 ```
 
 #MSE 
-Foward , 21614.35 MSE. The diagnostic plot shows a strong outlier.
-Sequential, 21380.49
+Foward 18, 22043 MSE. The diagnostic plot shows a strong outlier.
+Sequential 21, 22186
+Forward 10, 21181.48
+Sequential 10 21424.59
+Foward w/ sqrt weights 25, 19451.44
+Sequential w/ sqrt weights 25 (28), 19670.72
 ```{r}
 mean.cv.errors.limited.weights =apply(cv.errors.m3 ,2, mean)
 mean.cv.errors.limited.weights
 plot(mean.cv.errors.limited.weights ,type='b')
 which(mean.cv.errors.limited.weights==min(mean.cv.errors.limited.weights))
+mean.cv.errors.limited.weights[which(mean.cv.errors.limited.weights==min(mean.cv.errors.limited.weights))]
 ```
 
 Removed Extra econ variables for high vif
+trying with sqrt weights
 ```{r}
-sub_model_build <- subset(numeric_cols_sing_rm,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r,-a1_all_abs_r,-a1_all_oth_r,-r_all_rs,-w_all_rs,-DZCAMPUS,-DPETBLAP,-DPETHISP,-DPETWHIP,-DPETINDP,
--DPETASIP,-DPETPCIP,-DPETTWOP,-DPETBILP,-DPSTTOFC,-DPFEAOPFT,-DPFEAINST,
--DPETALLC,-DPETECOP,-DPETLEPP,-DPSATOFC,-DPSAMIFP,-DPFRAALLT,-DPFEAALLT))
-weights <- numeric_cols_sing_rm[,c("a1_all_d")] 
+#sub_model_build <- subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPSATOFC,-DPSTTOFC,-DPSCTOFP,-DPSSTOFP,-DPSUTOFP,-DPSTTOFP,-DPSETOFP,-DPSXTOFP,-DPSAMIFP,-DPSAKIDR,-DPSTKIDR,-DPST05FP,-DPSTEXPA,-DPSTBLFP,-DPSTHIFP,-DPSTWHFP,-DPSTO2FP,-DPSTREFP,-DPSTSPFP,-DPSTCOFP,-DPSTBIFP,-DPSTVOFP,-DPSTGOFP,-DPFRAALLT,-DPFRASTAP,-DZRVLOCP,-DPFRAFEDP,-DPFEAALLT, -DPFEAINST))
+sub_model_build <- subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+weights <- sqrt(frame_split$test[,c("a1_all_d")])
 reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('forward'),weights=weights)
-coef(reg.best,13)
-select_var <- names(coef(reg.best,13))[-1]
+coef(reg.best,20)
+select_var <- names(coef(reg.best,20))[-1]
 ```
 
 ```{r}
@@ -742,6 +845,9 @@ plot(m3.limited.weights)
 This is Houston. It is humongous
 ```{r}
 all_years['2667','DISTNAME']
+all_years['3486','DISTNAME']
+all_years['5641','DISTNAME']
+all_years['2641','DISTNAME']
 ```
 
 ### check for multicolinearity
@@ -749,6 +855,19 @@ Restricted to forward selection. In stepwise there was bad multicolinearity.
 This model confirms many of our pre-existing assumptions. It is good from that perspective.
 ```{r}
 vif(m3.limited.weights)
+```
+
+### make plots to show the effect of each variable
+```{r}
+for (var_name in names(coef(m3.limited.weights)[2:14])){
+  graph_path <- "E:/STAT685/Graphs/"
+  #png(paste0(""))
+  pp <- plot(numeric_cols_sing_rm[,"a1_all_rs"],numeric_cols_sing_rm[,var_name],
+       main=paste("Average Scale Score vs.", var_name))
+  png(paste0(graph_path,"resp",var_name,".png"), width=648, height=432)
+  print(pp)
+  dev.off()
+}
 ```
 
 ```{r}
@@ -760,16 +879,17 @@ to_remove3 = c(-DPETALLC,-DPETECOP,-DPETLEPP,-DPSATOFC,-DPSAMIFP,
 
 ## Check the limited variable model without weights and compare
 ```{r}
-k=5
+k=10
+folds=sample (1:k,nrow(frame_split$train),replace =TRUE)
 cv.errors.m4 =matrix (NA ,k,70, dimnames =list(NULL , paste (1:70) ))
 for(j in 1:k){
-  k_out <- (numeric_cols_sing_rm$k_indices != j)
-  k_in <- (numeric_cols_sing_rm$k_indices == j)
-  k_fold <- subset(numeric_cols_sing_rm,subset=k_out,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r,-r_all_rs,-w_all_rs,-DZCAMPUS,-DPETBLAP,-DPETHISP,-DPETWHIP,-DPETINDP,
--DPETASIP,-DPETPCIP,-DPETTWOP,-DPETBILP,-DPSTTOFC,-DPFEAOPFT,-DPFEAINST,
--DPETALLC,-DPETECOP,-DPETLEPP,-DPSATOFC,-DPSAMIFP))
-  k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-REGION.y))
-  weights <- numeric_cols_sing_rm[k_out,c("a1_all_d")]
+  #k_out <- (numeric_cols_sing_rm$k_indices != j)
+  #k_in <- (numeric_cols_sing_rm$k_indices == j)
+  #k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-a1_all_d,-REGION.x,-REGION.y))
+  k_fold_test <- subset(frame_split$train,subset=(folds==j),select=c(-a1_all_d,-REGION.y))
+  k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPSATOFC,-DPSTTOFC,-DPSCTOFP,-DPSSTOFP,-DPSUTOFP,-DPSTTOFP,-DPSETOFP,-DPSXTOFP,-DPSAMIFP,-DPSAKIDR,-DPSTKIDR,-DPST05FP,-DPSTEXPA,-DPSTBLFP,-DPSTHIFP,-DPSTWHFP,-DPSTO2FP,-DPSTREFP,-DPSTSPFP,-DPSTCOFP,-DPSTBIFP,-DPSTVOFP,-DPSTGOFP,-DPFRAALLT,-DPFRASTAP,-DZRVLOCP,-DPFRAFEDP,-DPFEAALLT, -DPFEAINST))
+  #k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-REGION.y))
+  #weights <- frame_split$train[(folds!=j),c("a1_all_d")]
   best.fit =regsubsets(a1_all_rs**-1.39∼.,data=k_fold,nvmax =70,method=c('seqrep'))
   for(i in 1:70) {
     pred=predict(best.fit ,k_fold_test, id=i)
@@ -780,25 +900,31 @@ for(j in 1:k){
 }
 ```
 
-Lowest was at 60, 19753.
+Lowest was at 26, 19763.
+Lowest was at 17, 19625.18
 ```{r}
 mean.cv.errors.noweights.limited =apply(cv.errors.m4 ,2, mean)
 mean.cv.errors.noweights.limited
 plot(mean.cv.errors.noweights.limited ,type='b')
 which(mean.cv.errors.noweights.limited==min(mean.cv.errors.noweights.limited))
+mean.cv.errors.noweights.limited[which(mean.cv.errors.noweights.limited==min(mean.cv.errors.noweights.limited))]
 ```
 
 ## without weights 32 variable model selected, w/ limited data
+try taking the log of the weights to reduce their power over houston
+log not powerful enough what about sqrt
+or could box cox also work here?
+sqrt kinda works
 ```{r}
-sub_model_build <- subset(numeric_cols_sing_rm,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r,-a1_all_abs_r,-a1_all_oth_r,-r_all_rs,-w_all_rs,-DZCAMPUS,-DPETBLAP,-DPETHISP,-DPETWHIP,-DPETINDP,
--DPETASIP,-DPETPCIP,-DPETTWOP,-DPETBILP,-DPSTTOFC,-DPFEAOPFT,-DPFEAINST,
--DPETALLC,-DPETECOP,-DPETLEPP,-DPSATOFC,-DPSAMIFP))
-#weights <- numeric_cols_sing_rm[,c("seqrep")] 
+sub_model_build <- subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPSATOFC,-DPSTTOFC,-DPSCTOFP,-DPSSTOFP,-DPSUTOFP,-DPSTTOFP,-DPSETOFP,-DPSXTOFP,-DPSAMIFP,-DPSAKIDR,-DPSTKIDR,-DPST05FP,-DPSTEXPA,-DPSTBLFP,-DPSTHIFP,-DPSTWHFP,-DPSTO2FP,-DPSTREFP,-DPSTSPFP,-DPSTCOFP,-DPSTBIFP,-DPSTVOFP,-DPSTGOFP,-DPFRAALLT,-DPFRASTAP,-DZRVLOCP,-DPFRAFEDP,-DPFEAALLT, -DPFEAINST))
+
+weights <- sqrt(frame_split$test[,c("a1_all_d")])
 reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('seqrep'))
-coef(reg.best,60)
-select_var <- names(coef(reg.best,60))[-1]
+coef(reg.best,17)
+select_var <- names(coef(reg.best,17))[-1]
 ```
 
+Plopping in the weights takes care of the residuals but causes outliers
 ```{r}
 #select_var
 m4.noweights.limited <- lm(a1_all_rs**-1.39 ~ .
@@ -810,9 +936,13 @@ m4.noweights.limited <- lm(a1_all_rs**-1.39 ~ .
 
 
 ### check diagnostic plots
+Increasing variance, not good
+But if I plop in the weights it looks good
 ```{r}
 plot(m4.noweights.limited)
 ```
+
+## outliers
 
 ### check for multicolinearity
 
@@ -838,26 +968,67 @@ ggplot(plot_mse) +
 
 Compare diagnostics from the different models
 ```{r}
+
 ```
+
+Compare MSE on the test sets
+and on the validation set
+Also do MAE?
+```{r}
+  pred1=predict(model.no_weights.all_vars ,frame_split$validate)
+  pred2=predict(model.weights.all_vars ,frame_split$validate)
+  pred3=predict(m3.limited.weights ,frame_split$validate)
+  pred4=predict(m4.noweights.limited ,frame_split$validate)
+  mean( (frame_split$validate$a1_all_rs-pred1**(-1/1.39))^2,na.rm = TRUE)
+  mean( (frame_split$validate$a1_all_rs-pred2**(-1/1.39))^2,na.rm = TRUE)
+  mean( (frame_split$validate$a1_all_rs-pred3**(-1/1.39))^2,na.rm = TRUE)
+  mean( (frame_split$validate$a1_all_rs-pred4**(-1/1.39))^2,na.rm = TRUE)
+  mean( abs(frame_split$validate$a1_all_rs-pred1**(-1/1.39)),na.rm = TRUE)
+  mean( abs(frame_split$validate$a1_all_rs-pred2**(-1/1.39)),na.rm = TRUE)
+  mean( abs(frame_split$validate$a1_all_rs-pred3**(-1/1.39)),na.rm = TRUE)
+  mean( abs(frame_split$validate$a1_all_rs-pred4**(-1/1.39)),na.rm = TRUE)
+```
+
 
 ## lasso model
 ## should try elastic net
 Trying without weights first. Run on train test split
+Lasso did amazing
 ```{r}
 library(glmnet)
 #cv.glmnet
 set.seed(1011)
-X <- as.matrix(subset(numeric_cols_sing_rm,subset = (numeric_cols_sing_rm$train_ind == 1) ,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r -a1_all_rs)))
-y <- numeric_cols_sing_rm[(numeric_cols_sing_rm$train_ind == 1),'a1_all_rs']**-1.39
+X <- as.matrix(subset(frame_split$train ,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
+y <- frame_split$train$a1_all_rs**-1.39
 #without weights
 elastic_net <- cv.glmnet(X,y,nfolds = 5)
+#print(elastic_net)
 summary(elastic_net)
 plot(elastic_net)
 coef(elastic_net)
+coef(elastic_net, s='lambda.min')
 bestlam =elastic_net$lambda.min
-X_test <- X <- as.matrix(subset(numeric_cols_sing_rm,subset = (numeric_cols_sing_rm$train_ind == 0) ,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,-a1_all_abs_r,-a1_all_oth_r -a1_all_rs)))
-res.lasso <- predict(elastic_net,X_test,type ="coefficients",s=bestlam)
-res.lasso
+
+X_test <- as.matrix(subset(frame_split$test ,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
+#res.lasso <- predict(elastic_net,X_test,type ="coefficients",s=bestlam)
+#res.lasso
+
+pred.lasso.test = predict(elastic_net, newx = X_test, s=bestlam)
+mean( (frame_split$test$a1_all_rs-pred.lasso.test**(-1/1.39))^2)
+mean( abs(frame_split$test$a1_all_rs-pred.lasso.test**(-1/1.39)))
+
+bestlam
+new.xx <- as.matrix(subset(frame_split$validate ,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
+pred5 = predict(elastic_net, newx = new.xx, s=bestlam)
+mean( (frame_split$validate$a1_all_rs-pred5**(-1/1.39))^2)
+mean( abs(frame_split$validate$a1_all_rs-pred5**(-1/1.39)))
+```
+
+#plot predicted vs actual
+```{r}
+  plot(frame_split$validate$a1_all_rs,pred3**(-1/1.39))
+  plot(frame_split$validate$a1_all_rs,pred5**(-1/1.39))
+  plot(frame_split$test$a1_all_rs,pred.lasso.test**(-1/1.39))
 ```
 
 Trying with weights first
@@ -865,11 +1036,78 @@ Trying with weights first
 ## test via correlation
 
 ### Random Forest
+still need to tune the random forest
+```{r}
+library(randomForest)
+
+X <- as.matrix(subset(frame_split$train,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
+
+rf1 <- randomForest(a1_all_rs~.,data=X, ntree=100)
+
+```
+
+```{r}
+#sort(importance(rf1))
+
+varImpPlot(rf1,n.var=20)
+```
+
+#prediction with randomforest
+Random forest performed slightly better than regression without hyperparameter tuning
+Required 1000 trees
+Roughly the same error with 100 trees
+```{r}
+new.xx <- as.matrix(subset(frame_split$validate ,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
+pred6 = predict(rf1,new.xx)
+mean( (frame_split$validate$a1_all_rs-pred6)^2)
+mean( abs(frame_split$validate$a1_all_rs-pred6))
+```
 
 ### XG Boost
 
 ```{r}
 library(xgboost)
+
+# need to select a grid of hyper parameters
+X_train <- as.matrix(subset(frame_split$train,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
+y_train <- frame_split$train$a1_all_rs
+X_test <- as.matrix(subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
+y_test <- frame_split$test$a1_all_rs
+
+params <- list(booster = "gblinear", objective = "reg:squarederror", eta=0.3, gamma=0, max_depth=50, min_child_weight=1, subsample=1, colsample_bytree=1)
+
+dtrain <- xgb.DMatrix(X_train, label=y_train)
+dtest <- xgb.DMatrix(X_test, label=y_test)
+
+xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 500, nfold = 5, showsd = T, stratified = T, print_every_n = 20, early_stop_round = 20, maximize = F)
 ```
+
+```{r}
+xgb1 <- xgb.train (params = params, data = dtrain, nrounds = 500, watchlist = list(val=dtrain,train=dtest), print_every_n = 10, early_stop_round = 10, maximize = F , eval_metric = "error")
+```
+
+#view variable importance plot
+```{r}
+mat <- xgb.importance(feature_names=colnames(X_test), model=xgb1)
+xgb.plot.importance(importance_matrix = mat[1:20])
+
+```
+
+#predict with xgb 
+XGB performed about as well as regression without much tuning
+```{r}
+new.xx <- as.matrix(subset(frame_split$validate ,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
+pred7 = predict(xgb1,new.xx)
+mean( (frame_split$validate$a1_all_rs-pred7)^2)
+mean( abs(frame_split$validate$a1_all_rs-pred7))
+```
+
+#compare models on same validation set? 
+
+#compare residuals vs fitted
+
+#compare predicted vs acutal
+
+#compare mse
 
 
