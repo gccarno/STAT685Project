@@ -108,7 +108,7 @@ The overall score is increasing year over year. This can also be seen in the gif
 #violin plots
 p <- ggplot(all_years, aes(x=as.factor(YEAR), y=a1_all_rs)) + 
   geom_violin()
-p
+p + ggtitle('Average Algebra 1 Score Over Years') + xlab('Testing Year') + ylab('Average Algebra 1 Score')
 ```
 
 ## Preliminary Plots
@@ -116,8 +116,9 @@ The initial plots give a good idea of the sign of certain predictors. Variable s
 
 ### 7th Grade Test scores
 ```{r}
-plot(all_years[all_years$YEAR >= 14,c('a1_all_rs','m_all_rs','r_all_rs','w_all_rs')],
-     main='7th Grade Test scores Compared to Algebra I scores')
+plt_mini <- all_years[all_years$YEAR >= 14,c('a1_all_rs','m_all_rs','r_all_rs','w_all_rs')]
+colnames(plt_mini) <- c('Algebra 1 Exam Score', '7th Grade Math Score', '7th Grade Reading Score', '7th Grade Writing Score')
+plot(plt_mini,main='7th Grade Test Scores Compared to 9th Grade Algebra I scores')
 ```
 
 ```{r}
@@ -306,14 +307,14 @@ plot(p1)
 ### boxplot by community type
 ```{r}
 ggplot(data=all_years[all_years$YEAR <= 17,],aes(x=COMMTYPE,y=a1_all_rs))+geom_boxplot()+
-theme(axis.text.x = element_text(angle = 90, hjust = 1))
+theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10)) + labs(title='Average Algebra 1 Score by Community Type')+xlab('Community Type')+ylab('Average Algebra 1 Score')
 ```
 
 ### District Size
 We see here that as district size increases the variance also decreases. This motivates using district size as a weighting variable.
 ```{r}
 ggplot(data=all_years[all_years$YEAR <= 17,],aes(x=DISTSIZE,y=a1_all_rs))+geom_boxplot()+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10)) + labs(title='Average Algebra 1 Score by District Size')+xlab('District Size')+ylab('Average Algebra 1 Score')
 ```
 
 
@@ -322,7 +323,7 @@ ggplot(data=all_years[all_years$YEAR <= 17,],aes(x=DISTSIZE,y=a1_all_rs))+geom_b
 levels(all_years$DISTSIZE)
 all_years$DISTSIZE_reorder <- factor(all_years$DISTSIZE,levels(all_years$DISTSIZE)[c(9,8,1,2,5,6,3,4,7)])
 ggplot(data=all_years[all_years$YEAR <= 17,],aes(x=DISTSIZE_reorder,y=a1_all_rs))+geom_boxplot()+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10)) + labs(title='Average Algebra 1 Score by District Size')+xlab('District Size')+ylab('Average Algebra 1 Score')
 plot(all_years$a1_all_d,all_years$a1_all_rs,main="District Size Vs Average Score")
 ```
 
@@ -548,7 +549,7 @@ sing_val_coef.1
 ## Run principle components
 ```{r}
 #prin.comp.cols <- princomp(subset(numeric_cols_sing_rm, select=-c(train_ind,k_indices,a1_all_d)),cor=TRUE)
-prin.comp.cols <- princomp(subset(frame_split$train, select=-c(a1_all_d)),cor=TRUE)
+prin.comp.cols <- princomp(subset(frame_split$train, select=-c(a1_all_d,train_ind,k_indices,a1_all_rs)),cor=TRUE)
 summary(prin.comp.cols)
 plot(prin.comp.cols)
 
@@ -558,11 +559,49 @@ plot(prin.comp.cols)
 #plot first two principal components colored by a1_all_rs
 #ggplot(prin.comp.cols$loadings[,1],prin.comp.cols$loadings[,1],colour=frame_split$train$a1_all_rs)
 #biplot(prin.comp.cols)
-prin_comp_frame <- data.frame(cbind(prin.comp.cols$scores[,1:2],frame_split$train$a1_all_rs))
+#[1] "Charters"                   "IndependentTown"            "MajorSuburban"             
+#[4] "MajorUrban"                 "NonmetropolitanFastGrowing" "NonmetropolitanStable"     
+#[7] "OtherCentralCity"           "OtherCentralCitySuburban"   "Rural"  
+prin_comp_frame <- data.frame(cbind(prin.comp.cols$scores[,1:2],algebra1score=frame_split$train$a1_all_rs ))
+ # ,frame_split$train$Charters,frame_split$train$IndependentTown,frame_split$train$MajorSuburban
+ # ,frame_split$train$MajorUrban,frame_split$train$NonmetropolitanFastGrowing,frame_split$train$NonmetropolitanStable
+ # ,frame_split$train$OtherCentralCity,frame_split$train$OtherCentralCitySuburban,frame_split$train$Rural))
 p <- ggplot(prin_comp_frame,aes(Comp.1, Comp.2))
-p + geom_point(aes(colour = V3))
+p + geom_point(aes(colour = algebra1score)) + ggtitle('Principal Components Colored by Algebra Score') + labs(fill='Algebra 1 Score') + scale_colour_gradient(low='red',high='green')
 ```
 
+```{r}
+library(tibble)
+#library(dplyr)
+#left_join(rownames_to_column(prin_comp_frame), all_years$COMMTYPE, by = ("rowname" = "Symbol"))
+res_prin_col <- merge(prin_comp_frame,all_years$COMMTYPE, all.x=TRUE, by='row.names')
+ggplot(res_prin_col,aes(Comp.1, Comp.2)) + geom_point(aes(colour = y)) + labs(color="Community Type") + ggtitle('First Two Components Colored by Community Type')
+#par(mfrow=c(3,3))
+#for (x in levels(res_prin_col$y)){
+  #print(x)
+#  p <- ggplot(res_prin_col[res_prin_col$y==x,],aes(Comp.1, Comp.2)) + geom_point(aes(colour = y)) + ggtitle(paste("Community"),x) + xlim(-10,30) + ylim(-10,20) 
+#  print(p)
+#}
+```
+
+```{r}
+print('Component 1')
+sort(prin.comp.cols$loadings[,1])[1:5]
+sort(prin.comp.cols$loadings[,1],decreasing=TRUE)[1:5]
+print('Component 1')
+sort(prin.comp.cols$loadings[,2])[1:5]
+sort(prin.comp.cols$loadings[,2],decreasing=TRUE)[1:5]
+print('Component 1')
+sort(prin.comp.cols$loadings[,3])[1:5]
+sort(prin.comp.cols$loadings[,3],decreasing=TRUE)[1:5]
+print('Component 1')
+sort(prin.comp.cols$loadings[,4])[1:5]
+sort(prin.comp.cols$loadings[,4],decreasing=TRUE)[1:5]
+```
+
+##additional plots
+```{r}
+```
 
 ##transform the predictor using box-cox
 ```{r}
@@ -588,6 +627,25 @@ qqnorm(numeric_cols_sing_rm$a1_all_rs,main="Untransformed Normal QQ")
 qqnorm(numeric_cols_sing_rm$a1_all_rs**-1.39,main="Transformed Normal QQ")
 ```
 
+```{r}
+res_k_box_cox <- rep(0,5)
+for (k in seq(1,5)){
+k_out <- (numeric_cols_sing_rm$k_indices != k)
+k_fold <- subset(numeric_cols_sing_rm,subset=k_out,select=a1_all_d)
+ones <- rep(1, length(k_fold$a1_all_d))
+a <- boxcox(lm(k_fold$a1_all_d ~ ones),lambda = seq(-4, 2, 1/10))
+max_x_for_y<- function(BC){
+  with(BC, x[which.max(y)])
+}
+#plot(a)
+res_k_box_cox[k]<-max_x_for_y(a)
+}
+res_k_box_cox 
+shapiro.test(numeric_cols_sing_rm$a1_all_d**-.181)
+qqnorm(numeric_cols_sing_rm$a1_all_d,main="Untransformed Normal QQ")
+qqnorm(numeric_cols_sing_rm$a1_all_rs**-.181,main="Transformed Normal QQ")
+```
+
 ## Stepwise forward selection with cross validation
 ### without weights
 
@@ -604,9 +662,9 @@ predict.regsubsets =function (object ,newdata ,id ,...){
 #things to remove
 #add this to intial removes
 ```{r}
-to_remove = c(-REGION.x,-REGION.y,
-                  -a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,
-                  -a1_all_abs_r,-a1_all_oth_r)
+#to_remove = c(-REGION.x,-REGION.y,
+ #                 -a1_all_docs_n,-a1_all_abs_n,-a1_all_oth_n,
+  #                -a1_all_abs_r,-a1_all_oth_r)
 ```
 
 #exclude region.y
@@ -778,7 +836,7 @@ trying with sqrt weights and some multicolinear removed
 ```{r}
 k=10
 folds=sample (1:k,nrow(frame_split$train),replace =TRUE)
-cv.errors.m3 =matrix (NA ,k,70, dimnames =list(NULL , paste (1:70) ))
+cv.errors.m3=matrix (NA ,k,70, dimnames =list(NULL , paste (1:70) ))
 for(j in 1:k){
   #k_out <- (numeric_cols_sing_rm$k_indices != j)
   #k_in <- (numeric_cols_sing_rm$k_indices == j)
@@ -793,7 +851,7 @@ for(j in 1:k){
     pred=predict(best.fit ,k_fold_test, id=i)
     #print(c(i,j,mean(pred)))
     # 2384 in prediction is off
-    cv.errors.m3 [j,i]=mean( (k_fold_test$a1_all_rs-pred**(-1/1.39))^2,na.rm = TRUE)
+    cv.errors.m3[j,i]=mean( (k_fold_test$a1_all_rs-pred**(-1/1.39))^2,na.rm = TRUE)
     }
 }
 ```
@@ -815,20 +873,37 @@ mean.cv.errors.limited.weights[which(mean.cv.errors.limited.weights==min(mean.cv
 
 Removed Extra econ variables for high vif
 trying with sqrt weights
+Minimum MSE is achieved at 30, but 20 looks just as good
 ```{r}
 #sub_model_build <- subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPSATOFC,-DPSTTOFC,-DPSCTOFP,-DPSSTOFP,-DPSUTOFP,-DPSTTOFP,-DPSETOFP,-DPSXTOFP,-DPSAMIFP,-DPSAKIDR,-DPSTKIDR,-DPST05FP,-DPSTEXPA,-DPSTBLFP,-DPSTHIFP,-DPSTWHFP,-DPSTO2FP,-DPSTREFP,-DPSTSPFP,-DPSTCOFP,-DPSTBIFP,-DPSTVOFP,-DPSTGOFP,-DPFRAALLT,-DPFRASTAP,-DZRVLOCP,-DPFRAFEDP,-DPFEAALLT, -DPFEAINST))
-sub_model_build <- subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
-weights <- sqrt(frame_split$test[,c("a1_all_d")])
-reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('forward'),weights=weights)
-coef(reg.best,20)
-select_var <- names(coef(reg.best,20))[-1]
+sub_model_build.train <- subset(frame_split$train,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+weights.train <- sqrt(frame_split$train[,c("a1_all_d")])
+sub_model_build.test <- subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+weights.test <- sqrt(frame_split$test[,c("a1_all_d")])
+reg.best.train=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build.train, nvmax =70,method=c('forward'),weights=weights.train)
+coef(reg.best,42)
+select_var.weight.limit.sq <- names(coef(reg.best,42))[-1]
 ```
 
 ```{r}
 #select_var
 m3.limited.weights <- lm(a1_all_rs**-1.39 ~ .
-             ,data=sub_model_build[,c(select_var,'a1_all_rs')],weights=weights)
+             ,data=sub_model_build.train[,c(select_var.weight.limit.sq ,'a1_all_rs')],weights=weights.train)
 #m_no_weights <- lm(a1_all_rs~.,data=sub_model_no_weights)
+
+summary(m3.limited.weights)
+m3.limited.weights.test <- lm(a1_all_rs**-1.39 ~ .
+             ,data=sub_model_build.test[,c(select_var.weight.limit.sq ,'a1_all_rs')],weights=weights.test)
+#m_no_weights <- lm(a1_all_rs~.,data=sub_model_no_weights)
+
+summary(m3.limited.weights.test)
+```
+## Variable Interpretation
+```{r}
+transform_coef <- function(x){
+  -sign(x)*abs(x)**(1/-1.39)
+}
+t(data.frame(lapply(coef(m3.limited.weights,20),transform_coef)))
 ```
 
 ## check the limited variable model without weights and compare MSE.
@@ -839,6 +914,7 @@ Some far outliers,
 
 ```{r}
 plot(m3.limited.weights)
+plot(m3.limited.weights.test)
 ```
 
 ##check one outlier
@@ -871,10 +947,105 @@ for (var_name in names(coef(m3.limited.weights)[2:14])){
 ```
 
 ```{r}
+plot(numeric_cols_sing_rm$a1_ethb_d_pct,numeric_cols_sing_rm$a1_all_rs,main="Percentage Black Tested vs. Average Scale Score",ylab="Average Scale Score",xlab="Percentage Black Tested")
+plot(numeric_cols_sing_rm$DPSTURNR,numeric_cols_sing_rm$a1_all_rs,main="Teacher Turnover Rate vs. Average Scale Score",ylab="Average Scale Score",xlab="Teacher Turnover Rate")
+plot(numeric_cols_sing_rm$a1_etha_d_pct,numeric_cols_sing_rm$a1_all_rs,main="Percent Asian Tested vs. Average Scale Score",ylab="Average Scale Score",xlab="Percentage Asian Tested")
+plot(numeric_cols_sing_rm$a1_lepf_d_pct,numeric_cols_sing_rm$a1_all_rs,main="Percentage Non-LEP (First Year Monitored) Students \n vs. Average Scale Score",ylab="Average Scale Score",xlab="Percentage Non-LEP (First Year Monitored) Students Tested")
+plot(numeric_cols_sing_rm$a1_gify_d_pct,numeric_cols_sing_rm$a1_all_rs,main="Percentage Gifted Tested vs. Average Scale Score",ylab="Average Scale Score",xlab="Percentage Gifted Tested")
+plot(numeric_cols_sing_rm$a1_atry_d_pct,numeric_cols_sing_rm$a1_all_rs,main="Percentage At Risk Tested vs. Average Scale Score",ylab="Average Scale Score",xlab="Percentage At Risk Tested")
+plot(numeric_cols_sing_rm$a1_spey_d_pct,numeric_cols_sing_rm$a1_all_rs,main="Percentage Special Education Tested vs. Average Scale Score",ylab="Average Scale Score",xlab="Percentage Special Education Tested")
+plot(numeric_cols_sing_rm$a1_eco1_d_pct,numeric_cols_sing_rm$a1_all_rs,main="Percentage Free Meal Students Tested vs. Average Scale Score",ylab="Average Scale Score",xlab="Percentage Free Meal Students Tested")
+```
+
+```{r}
 #variables in third round
 #additiona variables that duplicate information
-to_remove3 = c(-DPETALLC,-DPETECOP,-DPETLEPP,-DPSATOFC,-DPSAMIFP,
-)
+#to_remove3 = c(-DPETALLC,-DPETECOP,-DPETLEPP,-DPSATOFC,-DPSAMIFP,)
+```
+
+## Run without sqrt weights
+Using forward selection
+It gave more interpretable estimates
+trying with sqrt weights and some multicolinear removed
+```{r}
+k=10
+folds=sample (1:k,nrow(frame_split$train),replace =TRUE)
+cv.errors.m3.nsq =matrix (NA ,k,70, dimnames =list(NULL , paste (1:70) ))
+for(j in 1:k){
+  #k_out <- (numeric_cols_sing_rm$k_indices != j)
+  #k_in <- (numeric_cols_sing_rm$k_indices == j)
+  #k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-a1_all_d,-REGION.x,-REGION.y))
+  k_fold_test <- subset(frame_split$train,subset=(folds==j),select=c(-a1_all_d,-REGION.y))
+  #k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPSATOFC,-DPSTTOFC,-DPSCTOFP,-DPSSTOFP,-DPSUTOFP,-DPSTTOFP,-DPSETOFP,-DPSXTOFP,-DPSAMIFP,-DPSAKIDR,-DPSTKIDR,-DPST05FP,-DPSTEXPA,-DPSTBLFP,-DPSTHIFP,-DPSTWHFP,-DPSTO2FP,-DPSTREFP,-DPSTSPFP,-DPSTCOFP,-DPSTBIFP,-DPSTVOFP,-DPSTGOFP,-DPFRAALLT,-DPFRASTAP,-DZRVLOCP,-DPFRAFEDP,-DPFEAALLT, -DPFEAINST))
+  k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+  #k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-REGION.y))
+  weights <- frame_split$train[(folds!=j),c("a1_all_d")]
+  best.fit =regsubsets(a1_all_rs**-1.39∼.,data=k_fold,nvmax =70,method=c('forward'),weights=weights)
+  for(i in 1:70) {
+    pred=predict(best.fit ,k_fold_test, id=i)
+    #print(c(i,j,mean(pred)))
+    # 2384 in prediction is off
+    cv.errors.m3.nsq [j,i]=mean( (k_fold_test$a1_all_rs-pred**(-1/1.39))^2,na.rm = TRUE)
+    }
+}
+```
+#MSE 
+Foward 18, 22043 MSE. The diagnostic plot shows a strong outlier.
+Sequential 21, 22186
+Forward 10, 21181.48
+Sequential 10 21424.59
+Foward w/ sqrt weights 25, 19451.44
+Sequential w/ sqrt weights 25 (28), 19670.72
+Foward 63 w/o sqrt weights, but good at 12
+```{r}
+mean.cv.errors.limited.weights.nsq =apply(cv.errors.m3.nsq ,2, mean)
+mean.cv.errors.limited.weights.nsq
+plot(mean.cv.errors.limited.weights.nsq ,type='b')
+which(mean.cv.errors.limited.weights.nsq==min(mean.cv.errors.limited.weights))
+mean.cv.errors.limited.weights.nsq[which(mean.cv.errors.limited.weights.nsq==min(mean.cv.errors.limited.weights.nsq))]
+```
+
+Removed Extra econ variables for high vif
+trying with sqrt weights
+```{r}
+#sub_model_build <- subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPSATOFC,-DPSTTOFC,-DPSCTOFP,-DPSSTOFP,-DPSUTOFP,-DPSTTOFP,-DPSETOFP,-DPSXTOFP,-DPSAMIFP,-DPSAKIDR,-DPSTKIDR,-DPST05FP,-DPSTEXPA,-DPSTBLFP,-DPSTHIFP,-DPSTWHFP,-DPSTO2FP,-DPSTREFP,-DPSTSPFP,-DPSTCOFP,-DPSTBIFP,-DPSTVOFP,-DPSTGOFP,-DPFRAALLT,-DPFRASTAP,-DZRVLOCP,-DPFRAFEDP,-DPFEAALLT, -DPFEAINST))
+sub_model_build <- subset(frame_split$train,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+weights <- frame_split$train[,c("a1_all_d")]
+reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('forward'),weights=weights)
+coef(reg.best,20)
+select_var.weight.limit <- names(coef(reg.best,20))[-1]
+```
+
+```{r}
+#select_var
+m3.limited.weights.nsq <- lm(a1_all_rs**-1.39 ~ .
+             ,data=sub_model_build[,c(select_var.weight.limit,'a1_all_rs')],weights=weights)
+#m_no_weights <- lm(a1_all_rs~.,data=sub_model_no_weights)
+summary(m3.limited.weights.nsq)
+```
+
+## check the limited variable model without weights and compare MSE.
+
+
+### check diagnostic plots
+Some far outliers, 
+
+```{r}
+plot(m3.limited.weights.nsq)
+```
+
+##vif
+```{r}
+vif(m3.limited.weights.nsq)
+```
+
+##check one outlier
+This is Houston. It is humongous
+```{r}
+all_years['2667','DISTNAME']
+all_years['3486','DISTNAME']
+all_years['5641','DISTNAME']
+all_years['2641','DISTNAME']
 ```
 
 ## Check the limited variable model without weights and compare
@@ -887,7 +1058,7 @@ for(j in 1:k){
   #k_in <- (numeric_cols_sing_rm$k_indices == j)
   #k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-a1_all_d,-REGION.x,-REGION.y))
   k_fold_test <- subset(frame_split$train,subset=(folds==j),select=c(-a1_all_d,-REGION.y))
-  k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPSATOFC,-DPSTTOFC,-DPSCTOFP,-DPSSTOFP,-DPSUTOFP,-DPSTTOFP,-DPSETOFP,-DPSXTOFP,-DPSAMIFP,-DPSAKIDR,-DPSTKIDR,-DPST05FP,-DPSTEXPA,-DPSTBLFP,-DPSTHIFP,-DPSTWHFP,-DPSTO2FP,-DPSTREFP,-DPSTSPFP,-DPSTCOFP,-DPSTBIFP,-DPSTVOFP,-DPSTGOFP,-DPFRAALLT,-DPFRASTAP,-DZRVLOCP,-DPFRAFEDP,-DPFEAALLT, -DPFEAINST))
+  k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
   #k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-REGION.y))
   #weights <- frame_split$train[(folds!=j),c("a1_all_d")]
   best.fit =regsubsets(a1_all_rs**-1.39∼.,data=k_fold,nvmax =70,method=c('seqrep'))
@@ -910,13 +1081,15 @@ which(mean.cv.errors.noweights.limited==min(mean.cv.errors.noweights.limited))
 mean.cv.errors.noweights.limited[which(mean.cv.errors.noweights.limited==min(mean.cv.errors.noweights.limited))]
 ```
 
+
+
 ## without weights 32 variable model selected, w/ limited data
 try taking the log of the weights to reduce their power over houston
 log not powerful enough what about sqrt
 or could box cox also work here?
 sqrt kinda works
 ```{r}
-sub_model_build <- subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPSATOFC,-DPSTTOFC,-DPSCTOFP,-DPSSTOFP,-DPSUTOFP,-DPSTTOFP,-DPSETOFP,-DPSXTOFP,-DPSAMIFP,-DPSAKIDR,-DPSTKIDR,-DPST05FP,-DPSTEXPA,-DPSTBLFP,-DPSTHIFP,-DPSTWHFP,-DPSTO2FP,-DPSTREFP,-DPSTSPFP,-DPSTCOFP,-DPSTBIFP,-DPSTVOFP,-DPSTGOFP,-DPFRAALLT,-DPFRASTAP,-DZRVLOCP,-DPFRAFEDP,-DPFEAALLT, -DPFEAINST))
+sub_model_build <- subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
 
 weights <- sqrt(frame_split$test[,c("a1_all_d")])
 reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('seqrep'))
@@ -950,6 +1123,21 @@ plot(m4.noweights.limited)
 vif(m4.noweights.limited)
 ```
 
+#box cox on all variables
+boxcox on the weighted model with few parameters
+Box cox on all variables yielded an interval which contains 1 which suggests that only transformation of the the target is required. 
+```{r}
+sub_model_build <- subset(frame_split$train,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+weights <- sqrt(frame_split$train[,c("a1_all_d")])
+reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('forward'),weights=weights)
+#coef(reg.best,20)
+select_var.weight.limit.sq <- names(coef(reg.best,20))[-1]
+m3.bc <- lm(a1_all_rs**-1.39 ~ .
+             ,data=sub_model_build[,c(select_var.weight.limit.sq ,'a1_all_rs')],weights=weights)
+bc_all <- boxcox(m3.bc, lambda = seq(-2, 2, 1/10))
+```
+
+
 #compare MSE from the three models
 Comparison of MSE from the three techniques of choosing a model.
 This is not coming out how I like.
@@ -957,13 +1145,15 @@ This is not coming out how I like.
 
 plot_mse <- data.frame(cbind(seq(1,70),mean.cv.errors.no_weights.all_vars,mean.cv.errors.weights,
                                  mean.cv.errors.limited.weights, mean.cv.errors.noweights.limited))
-
+# The palette with grey:
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 ggplot(plot_mse) +
   geom_line(aes(x=V1,y=mean.cv.errors.no_weights.all_vars,colour="No Weights")) +
   geom_line(aes(x=V1,y=mean.cv.errors.weights,colour='Weights')) +
   geom_line(aes(x=V1,y=mean.cv.errors.limited.weights,colour='Weights + Limited Vars')) +
   geom_line(aes(x=V1,y=mean.cv.errors.noweights.limited,colour='No Weights + Limited Vars')) +
-  ggtitle("Mean Cross Validation Error with 5 Folds")
+  geom_line(aes(x=V1,y=mean.cv.errors.limited.weights.nsq,colour='Weights + Limited Vars + No Sqrt Weights')) +
+  ggtitle("Mean Cross Validation Error with 10 Folds") + scale_colour_manual(values=cbPalette) + xlab('Number of Variables')+ylab('Mean Square Error')
 ```
 
 Compare diagnostics from the different models
@@ -975,41 +1165,50 @@ Compare MSE on the test sets
 and on the validation set
 Also do MAE?
 ```{r}
+  res.pred = rep(0,5)
   pred1=predict(model.no_weights.all_vars ,frame_split$validate)
   pred2=predict(model.weights.all_vars ,frame_split$validate)
   pred3=predict(m3.limited.weights ,frame_split$validate)
   pred4=predict(m4.noweights.limited ,frame_split$validate)
+  pred.nsq=predict(m3.limited.weights.nsq ,frame_split$validate)
   mean( (frame_split$validate$a1_all_rs-pred1**(-1/1.39))^2,na.rm = TRUE)
   mean( (frame_split$validate$a1_all_rs-pred2**(-1/1.39))^2,na.rm = TRUE)
   mean( (frame_split$validate$a1_all_rs-pred3**(-1/1.39))^2,na.rm = TRUE)
   mean( (frame_split$validate$a1_all_rs-pred4**(-1/1.39))^2,na.rm = TRUE)
+  mean( (frame_split$validate$a1_all_rs-pred.nsq**(-1/1.39))^2,na.rm = TRUE)
   mean( abs(frame_split$validate$a1_all_rs-pred1**(-1/1.39)),na.rm = TRUE)
   mean( abs(frame_split$validate$a1_all_rs-pred2**(-1/1.39)),na.rm = TRUE)
   mean( abs(frame_split$validate$a1_all_rs-pred3**(-1/1.39)),na.rm = TRUE)
   mean( abs(frame_split$validate$a1_all_rs-pred4**(-1/1.39)),na.rm = TRUE)
+  mean( abs(frame_split$validate$a1_all_rs-pred.nsq**(-1/1.39)),na.rm = TRUE)
+```
+
+```{r}
 ```
 
 
 ## lasso model
 ## should try elastic net
 Trying without weights first. Run on train test split
-Lasso did amazing
+Lasso did not do great, had the target in the model
 ```{r}
 library(glmnet)
 #cv.glmnet
 set.seed(1011)
-X <- as.matrix(subset(frame_split$train ,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
+X <- as.matrix(subset(frame_split$train ,select=c(-k_indices,-train_ind,-a1_all_rs,-a1_all_d,-REGION.x,-REGION.y)))
 y <- frame_split$train$a1_all_rs**-1.39
 #without weights
-elastic_net <- cv.glmnet(X,y,nfolds = 5)
+elastic_net <- cv.glmnet(X,y,nfolds = 10)
 #print(elastic_net)
 summary(elastic_net)
 plot(elastic_net)
 coef(elastic_net)
 coef(elastic_net, s='lambda.min')
 bestlam =elastic_net$lambda.min
-
-X_test <- as.matrix(subset(frame_split$test ,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
+```
+Test model
+```{r}
+X_test <- as.matrix(subset(frame_split$test ,select=c(-k_indices,-train_ind,-a1_all_rs,-a1_all_d,-REGION.x,-REGION.y)))
 #res.lasso <- predict(elastic_net,X_test,type ="coefficients",s=bestlam)
 #res.lasso
 
@@ -1018,10 +1217,66 @@ mean( (frame_split$test$a1_all_rs-pred.lasso.test**(-1/1.39))^2)
 mean( abs(frame_split$test$a1_all_rs-pred.lasso.test**(-1/1.39)))
 
 bestlam
-new.xx <- as.matrix(subset(frame_split$validate ,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
+new.xx <- as.matrix(subset(frame_split$validate ,select=c(-k_indices,-train_ind,-a1_all_rs,-a1_all_d,-REGION.x,-REGION.y)))
 pred5 = predict(elastic_net, newx = new.xx, s=bestlam)
 mean( (frame_split$validate$a1_all_rs-pred5**(-1/1.39))^2)
 mean( abs(frame_split$validate$a1_all_rs-pred5**(-1/1.39)))
+```
+
+##box cox on the weights?
+
+
+##model with weights in lasso
+sqrt weights worked well with the lasso
+```{r}
+set.seed(1011)
+X <- as.matrix(subset(frame_split$train ,select=c(-k_indices,-train_ind,-a1_all_rs,-a1_all_d,-REGION.x,-REGION.y)))
+y <- frame_split$train$a1_all_rs**-1.39
+#weights.train <- sqrt(frame_split$train$a1_all_d)
+weights.train <- frame_split$train$a1_all_d**-.1818
+#without weights
+elastic_net <- cv.glmnet(X,y,nfolds = 10,weights = weights.train)
+#print(elastic_net)
+summary(elastic_net)
+plot(elastic_net)
+coef(elastic_net)
+coef(elastic_net, s='lambda.min')
+bestlam.weights =elastic_net$lambda.min
+pred.lasso.train.weights <- predict(elastic_net, newx = X, s=bestlam, weights=weights.train)
+
+X_test <- as.matrix(subset(frame_split$test ,select=c(-k_indices,-train_ind,-a1_all_rs,-a1_all_d,-REGION.x,-REGION.y)))
+weights.test <- sqrt(frame_split$test$a1_all_d)
+#weights.test <- frame_split$test$a1_all_d**-.1818
+#res.lasso <- predict(elastic_net,X_test,type ="coefficients",s=bestlam)
+#res.lasso
+
+pred.lasso.test.weights = predict(elastic_net, newx = X_test, s=bestlam, weights=weights.test)
+mean( (frame_split$test$a1_all_rs-pred.lasso.test.weights**(-1/1.39))^2)
+mean( abs(frame_split$test$a1_all_rs-pred.lasso.test.weights**(-1/1.39)))
+
+bestlam
+new.xx <- as.matrix(subset(frame_split$validate ,select=c(-k_indices,-train_ind,-a1_all_rs,-a1_all_d,-REGION.x,-REGION.y)))
+weights.val <- sqrt(frame_split$validate$a1_all_d)
+#weights.val <- frame_split$validate$a1_all_d**-.1818
+pred.lasso.validate.weights = predict(elastic_net, newx = new.xx, s=bestlam.weights,weights=weights.val)
+mean( (frame_split$validate$a1_all_rs-pred.lasso.validate.weights**(-1/1.39))^2,na.rm = TRUE)
+mean( abs(frame_split$validate$a1_all_rs-pred.lasso.validate.weights**(-1/1.39)),na.rm = TRUE)
+```
+
+## can I test multicolinearity with lasso
+no, does not work with the model, will need to test things myself
+```{r}
+#vif(elastic_net)
+```
+
+## Coefficients in Original Scale
+```{r}
+transform_coef <- function(x){
+  -sign(x)*abs(x)**(1/-1.39)
+}
+#rownames(coef(elastic_net, s='lambda.min'))
+x <- data.frame(rownames(coef(elastic_net, s='lambda.min')),sapply(coef(elastic_net, s='lambda.min'),transform_coef))
+write.csv(x, file="E:/STAT685/Report/lasso_coef.csv")
 ```
 
 #plot predicted vs actual
@@ -1031,7 +1286,81 @@ mean( abs(frame_split$validate$a1_all_rs-pred5**(-1/1.39)))
   plot(frame_split$test$a1_all_rs,pred.lasso.test**(-1/1.39))
 ```
 
+```{r}
+outlier=which((frame_split$validate$a1_all_rs-pred5**(-1/1.39))==max(frame_split$validate$a1_all_rs-pred5**(-1/1.39)))
+frame_split$validate[outlier,]
+outlier=which((frame_split$test$a1_all_rs-pred5**(-1/1.39))==max(frame_split$test$a1_all_rs-pred5**(-1/1.39)))
+frame_split$test[outlier,]
+```
+Bpth of these are 8th grade schools, so they are taking the test ahead of time. Which my explain the differences in results.
+```{r}
+all_years['6144',]
+all_years['3927',]
+```
+
+##plot predictors vs the predictions?
+```{r}
+#pred.lasso.train.weights
+#pred.lasso.test.weights
+#pred.lasso.validate.weights
+plot(frame_split$train$a1_all_rs,pred.lasso.train.weights**(1/-1.39))
+plot(frame_split$test$a1_all_rs,pred.lasso.test.weights**(1/-1.39))
+plot(frame_split$validate$a1_all_rs,pred.lasso.validate.weights**(1/-1.39))
+```
+
+##plot error/residuals vs predictors
+```{r}
+```
+
 Trying with weights first
+
+## try all interactions
+```{r}
+X <- subset(frame_split$train ,select=c(-k_indices,-train_ind,-a1_all_rs,-a1_all_d,-REGION.x,-REGION.y))
+interaction.train <- model.matrix( ~.^2, data=X)
+y <- frame_split$train$a1_all_rs**-1.39
+#weights <- sqrt(frame_split$train$a1_all_d)
+weights <- frame_split$train$a1_all_d**-.1818
+#without weights
+elastic_net.int <- cv.glmnet(interaction.train,y,nfolds = 10,weights = weights)
+```
+
+```{r}
+summary(elastic_net.int)
+plot(elastic_net.int)
+coef(elastic_net.int, s='lambda.min')
+```
+##non-zero coefficients
+```{r}
+tmp_coeffs <- coef(elastic_net.int, s = "lambda.min")
+data.frame(name = tmp_coeffs@Dimnames[[1]][tmp_coeffs@i + 1], coefficient = tmp_coeffs@x)
+```
+
+```{r}
+bestlamint.weights =elastic_net.int$lambda.min
+#pred.intlasso.train.weights <- predict(elastic_net, newx = X, s=bestlamint.weights, weights=weights)
+```
+
+```{r}
+#X_test <- as.matrix(subset(frame_split$test ,select=c(-k_indices,-train_ind,-a1_all_rs,-a1_all_d,-REGION.x,-REGION.y)))
+interaction.test <- model.matrix( ~.^2, data=subset(frame_split$test ,select=c(-k_indices,-train_ind,-a1_all_rs,-a1_all_d,-REGION.x,-REGION.y)))
+weights.test <- sqrt(frame_split$test$a1_all_d)
+#weights.test <- frame_split$test$a1_all_d**-.1818
+#res.lasso <- predict(elastic_net,X_test,type ="coefficients",s=bestlam)
+#res.lasso
+
+pred.intlasso.test.weights = predict(elastic_net.int, newx = interaction.test, s=bestlamint.weights, weights=weights.test)
+mean( (frame_split$test$a1_all_rs-pred.intlasso.test.weights**(-1/1.39))^2)
+mean( abs(frame_split$test$a1_all_rs-pred.intlasso.test.weights**(-1/1.39)))
+
+#new.xx <- as.matrix(subset(frame_split$validate ,select=c(-k_indices,-train_ind,-a1_all_rs,-a1_all_d,-REGION.x,-REGION.y)))
+interaction.val <- model.matrix( ~.^2, data=subset(frame_split$validate ,select=c(-k_indices,-train_ind,-a1_all_rs,-a1_all_d,-REGION.x,-REGION.y)))
+weights.val <- sqrt(frame_split$validate$a1_all_d)
+#weights.val <- frame_split$validate$a1_all_d**-.1818
+pred.intlasso.validate.weights = predict(elastic_net.int, newx = interaction.val, s=bestlamint.weights,weights=weights.val)
+mean( (frame_split$validate$a1_all_rs-pred.intlasso.validate.weights**(-1/1.39))^2,na.rm = TRUE)
+mean( abs(frame_split$validate$a1_all_rs-pred.intlasso.validate.weights**(-1/1.39)),na.rm = TRUE)
+```
 
 ## test via correlation
 
@@ -1049,7 +1378,7 @@ rf1 <- randomForest(a1_all_rs~.,data=X, ntree=100)
 ```{r}
 #sort(importance(rf1))
 
-varImpPlot(rf1,n.var=20)
+varImpPlot(rf1,n.var=20, main="Random Forest Variable Importance Plot")
 ```
 
 #prediction with randomforest
@@ -1063,50 +1392,134 @@ mean( (frame_split$validate$a1_all_rs-pred6)^2)
 mean( abs(frame_split$validate$a1_all_rs-pred6))
 ```
 
+## random forest with all interactions?
+```{r}
+rf2 <- randomForest(y~.,data=X, ntree=100)
+```
+
 ### XG Boost
 
 ```{r}
 library(xgboost)
 
 # need to select a grid of hyper parameters
-X_train <- as.matrix(subset(frame_split$train,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
+X_train <- as.matrix(subset(frame_split$train,select=c(-k_indices,-train_ind,-a1_all_d,-a1_all_rs,-REGION.x,-REGION.y)))
 y_train <- frame_split$train$a1_all_rs
-X_test <- as.matrix(subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
+X_test <- as.matrix(subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-a1_all_rs,-REGION.x,-REGION.y)))
 y_test <- frame_split$test$a1_all_rs
 
-params <- list(booster = "gblinear", objective = "reg:squarederror", eta=0.3, gamma=0, max_depth=50, min_child_weight=1, subsample=1, colsample_bytree=1)
+params <- list(booster = "gblinear", objective = "reg:squarederror", eta=0.3, gamma=0, max_depth=70, min_child_weight=1, subsample=1, colsample_bytree=1)
 
 dtrain <- xgb.DMatrix(X_train, label=y_train)
 dtest <- xgb.DMatrix(X_test, label=y_test)
 
 xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 500, nfold = 5, showsd = T, stratified = T, print_every_n = 20, early_stop_round = 20, maximize = F)
+print(xgbcv)
 ```
 
 ```{r}
-xgb1 <- xgb.train (params = params, data = dtrain, nrounds = 500, watchlist = list(val=dtrain,train=dtest), print_every_n = 10, early_stop_round = 10, maximize = F , eval_metric = "error")
+xgb1 <- xgb.train (params = params, data = dtrain, nrounds = 5000, watchlist = list(val=dtrain,train=dtest), print_every_n = 100, early_stop_round = 10, maximize = F , eval_metric = "error")
 ```
 
 #view variable importance plot
 ```{r}
 mat <- xgb.importance(feature_names=colnames(X_test), model=xgb1)
-xgb.plot.importance(importance_matrix = mat[1:20])
+xgb.plot.importance(importance_matrix = mat[1:20],main='XGB Variable Importance Plot')
 
 ```
 
 #predict with xgb 
 XGB performed about as well as regression without much tuning
 ```{r}
-new.xx <- as.matrix(subset(frame_split$validate ,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
+new.xx <- as.matrix(subset(frame_split$validate ,select=c(-k_indices,-train_ind,-a1_all_d,-a1_all_rs,-REGION.x,-REGION.y)))
 pred7 = predict(xgb1,new.xx)
 mean( (frame_split$validate$a1_all_rs-pred7)^2)
 mean( abs(frame_split$validate$a1_all_rs-pred7))
 ```
 
 #compare models on same validation set? 
+Compare MSE on the test sets
+and on the validation set
+Also do MAE?
+```{r}
+  pred1=predict(model.no_weights.all_vars ,frame_split$validate)
+  pred2=predict(model.weights.all_vars ,frame_split$validate)
+  pred3=predict(m3.limited.weights ,frame_split$validate)
+  pred4=predict(m4.noweights.limited ,frame_split$validate)
+  pred.nsq=predict(m3.limited.weights.nsq ,frame_split$validate)
+  new.xx <- as.matrix(subset(frame_split$validate ,select=c(-k_indices,-train_ind,-a1_all_rs,-a1_all_d,-REGION.x,-REGION.y)))
+  pred5 = predict(elastic_net, newx = new.xx, s=bestlam)
+  pred6 = predict(rf1,new.xx)
+  pred7 = predict(xgb1,new.xx)
+  mse.val <- rep(0,8)
+  mae.val <- rep(0,8)
+  model.names <- c('LM No Weights All Vars', 'LM Weights All Vars','LM Weights Limited Vars', 'LM No Weights Limited Vars', 'LM Weights Limited Vars No SQ','Lasso','Random Forest', 'XGBoost')
+  mse.val[1] <- mean( (frame_split$validate$a1_all_rs-pred1**(-1/1.39))^2,na.rm = TRUE)
+  mse.val[2] <- mean( (frame_split$validate$a1_all_rs-pred2**(-1/1.39))^2,na.rm = TRUE)
+  mse.val[3] <- mean( (frame_split$validate$a1_all_rs-pred3**(-1/1.39))^2,na.rm = TRUE)
+  mse.val[4] <- mean( (frame_split$validate$a1_all_rs-pred4**(-1/1.39))^2,na.rm = TRUE)
+  mse.val[5] <- mean( (frame_split$validate$a1_all_rs-pred.nsq**(-1/1.39))^2,na.rm = TRUE)
+  mse.val[6] <- mean( (frame_split$validate$a1_all_rs-pred5**(-1/1.39))^2)
+  mse.val[7] <- mean( (frame_split$validate$a1_all_rs-pred6)^2,na.rm = TRUE)
+  mse.val[8] <- mean( (frame_split$validate$a1_all_rs-pred7)^2)
+  mse.val[9] <- mean( (frame_split$validate$a1_all_rs-pred.lasso.validate.weights**(-1/1.39))^2)
+  mae.val[1] <- mean( abs(frame_split$validate$a1_all_rs-pred1**(-1/1.39)),na.rm = TRUE)
+  mae.val[2] <- mean( abs(frame_split$validate$a1_all_rs-pred2**(-1/1.39)),na.rm = TRUE)
+  mae.val[3] <- mean( abs(frame_split$validate$a1_all_rs-pred3**(-1/1.39)),na.rm = TRUE)
+  mae.val[4] <- mean( abs(frame_split$validate$a1_all_rs-pred4**(-1/1.39)),na.rm = TRUE)
+  mae.val[5] <- mean( abs(frame_split$validate$a1_all_rs-pred.nsq**(-1/1.39)),na.rm = TRUE)
+  mae.val[6] <- mean( abs(frame_split$validate$a1_all_rs-pred5**(-1/1.39)),na.rm = TRUE)
+  mae.val[7] <- mean( abs(frame_split$validate$a1_all_rs-pred6),na.rm = TRUE)
+  mae.val[8] <- mean( abs(frame_split$validate$a1_all_rs-pred7))
+  mae.val[9] <- mean( abs(frame_split$validate$a1_all_rs-pred.lasso.validate.weights))
+  #test set
+  pred1=predict(model.no_weights.all_vars ,frame_split$test)
+  pred2=predict(model.weights.all_vars ,frame_split$test)
+  pred3=predict(m3.limited.weights ,frame_split$test)
+  pred4=predict(m4.noweights.limited ,frame_split$test)
+  pred.nsq=predict(m3.limited.weights.nsq ,frame_split$test)
+  new.xx <- as.matrix(subset(frame_split$test ,select=c(-k_indices,-train_ind,-a1_all_d,-a1_all_rs,-REGION.x,-REGION.y)))
+  pred5 = predict(elastic_net, newx = new.xx, s=bestlam)
+  pred6 = predict(rf1,new.xx)
+  pred7 = predict(xgb1,new.xx)
+  mse.test <- rep(0,8)
+  mae.test <- rep(0,8)
+  mse.test[1] <- mean( (frame_split$test$a1_all_rs-pred1**(-1/1.39))^2,na.rm = TRUE)
+  mse.test[2] <- mean( (frame_split$test$a1_all_rs-pred2**(-1/1.39))^2,na.rm = TRUE)
+  mse.test[3] <- mean( (frame_split$test$a1_all_rs-pred3**(-1/1.39))^2,na.rm = TRUE)
+  mse.test[4] <- mean( (frame_split$test$a1_all_rs-pred4**(-1/1.39))^2,na.rm = TRUE)
+  mse.test[5] <- mean( (frame_split$test$a1_all_rs-pred.nsq**(-1/1.39))^2,na.rm = TRUE)
+  mse.test[6] <- mean( (frame_split$test$a1_all_rs-pred5**(-1/1.39))^2)
+  mse.test[7] <- mean( (frame_split$test$a1_all_rs-pred6)^2,na.rm = TRUE)
+  mse.test[8] <- mean( (frame_split$test$a1_all_rs-pred7)^2)
+  mae.test[1] <- mean( abs(frame_split$test$a1_all_rs-pred1**(-1/1.39)),na.rm = TRUE)
+  mae.test[2] <- mean( abs(frame_split$test$a1_all_rs-pred2**(-1/1.39)),na.rm = TRUE)
+  mae.test[3] <- mean( abs(frame_split$test$a1_all_rs-pred3**(-1/1.39)),na.rm = TRUE)
+  mae.test[4] <- mean( abs(frame_split$test$a1_all_rs-pred4**(-1/1.39)),na.rm = TRUE)
+  mae.test[5] <- mean( abs(frame_split$test$a1_all_rs-pred.nsq**(-1/1.39)),na.rm = TRUE)
+  mae.test[6] <- mean( abs(frame_split$test$a1_all_rs-pred5**(-1/1.39)),na.rm = TRUE)
+  mae.test[7] <- mean( abs(frame_split$test$a1_all_rs-pred6),na.rm = TRUE)
+  mae.test[8] <- mean( abs(frame_split$test$a1_all_rs-pred7))
+  
+  #compile
+  final.comp <- data.frame(model.names,mse.val,mae.val,mse.test,mae.test)
+  final.comp
+```
 
 #compare residuals vs fitted
 
 #compare predicted vs acutal
+```{r}
+pred3.train=predict(m3.limited.weights ,frame_split$train)**(-1/1.39)
+pred3.test=predict(m3.limited.weights ,frame_split$test)**(-1/1.39)
+pred3.validate=predict(m3.limited.weights ,frame_split$validate)**(-1/1.39)
+plot(frame_split$train$a1_all_rs,pred3.train)
+plot(frame_split$test$a1_all_rs,pred3.test)
+plot(frame_split$validate$a1_all_rs,pred3.validate)
+plot(density(frame_split$train$a1_all_rs-pred3.train))
+lines(density(frame_split$test$a1_all_rs-pred3.test),col=2)
+lines(density(frame_split$validate$a1_all_rs-pred3.validate),col=3)
+```
 
 #compare mse
 
