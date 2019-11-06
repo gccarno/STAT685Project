@@ -34,7 +34,9 @@ library(ggplot2)
 library(reshape2)
 library(stringr)
 library(mice) # for missing values
-
+library(MASS)
+library(ISLR) 
+library(leaps)
 ```
 
 
@@ -51,6 +53,7 @@ dfy13ea1 <- read.csv(file=paste(path, 'dfy13ea1.csv',sep=''),na.strings=c("",'.'
 dfy12ea1 <- read.csv(file=paste(path, 'dfy12ea1.csv',sep=''),na.strings=c("",'.',"NA"))
 
 #read demographic data
+dem18 <- read.csv(file=paste(path, 'district2018.dat',sep=''),na.strings=c("",'.',"NA"))
 dem17 <- read.csv(file=paste(path, 'district2017.dat',sep=''),na.strings=c("",'.',"NA"))
 dem16 <- read.csv(file=paste(path, 'district2016.dat',sep=''),na.strings=c("",'.',"NA"))
 dem15 <- read.csv(file=paste(path, 'district2015.dat',sep=''),na.strings=c("",'.',"NA"))
@@ -65,6 +68,8 @@ dfy14e7 <- read.csv(file=paste(path, 'dfy14e7.dat',sep=''),na.strings=c("",'.',"
 dfy13e7 <- read.csv(file=paste(path, 'dfy13e7.csv',sep=''),na.strings=c("",'.',"NA"))
 dfy12e7 <- read.csv(file=paste(path, 'dfy12e7.csv',sep=''),na.strings=c("",'.',"NA"))
 
+#do not merge 2018 data, not enough time, too much rework
+#dfy18ea1 <- merge(dfy18ea1, dem18, by='DISTRICT',all.x=TRUE)
 dfy17ea1 <- merge(dfy17ea1, dem17, by='DISTRICT',all.x=TRUE)
 dfy16ea1 <- merge(dfy16ea1, dem16, by='DISTRICT',all.x =TRUE)
 dfy15ea1 <- merge(dfy15ea1, dem15, by='DISTRICT',all.x=TRUE)
@@ -121,7 +126,7 @@ colnames(plt_mini) <- c('Algebra 1 Exam Score', '7th Grade Math Score', '7th Gra
 plot(plt_mini,main='7th Grade Test Scores Compared to 9th Grade Algebra I scores')
 ```
 
-```{r}
+```{r eval = FALSE, echo = FALSE}
 ## plot vs select demographic data, only 17 and before are available
 ## taxable value per pupil,number of students per teacher,%economically disadvantaged
 plot(all_years[all_years$YEAR <= 17,c('a1_all_rs','DPFVTOTK','DPSTKIDR','DPETECOP')])
@@ -365,7 +370,7 @@ ncol(all_years) - ncol(val_years_n_vars)
 ```
 
 ## Remove variables that are not predictive
-A number of variables were removed by pattern. The patterns match the following kinds of columns; average scale score when it is not the main predictor or one of the 7th grade scores, avg variables which contain average items correct in a reporting category, pct which includes percent items correct in a reporting category, nm variables which contain the number meeting performance in certain categories, rm which contains the percentage meeting performance in certain categories, some _d variables which are counts of variables which were earlier converted to percnetages. Finally a1_all_docs_r was removed because it was found to have 0 variance later in modeling and produced singular matrices. Racial variables which were repeated in the test and demographic data were removed. 
+A number of variables were removed by pattern. The patterns match the following kinds of columns; average scale score when it is not the main predictor or one of the 7th grade scores, avg variables which contain average items correct in a reporting category, pct which includes percent items correct in a reporting category, nm variables which contain the number meeting performance in certain categories, rm which contains the percentage meeting performance in certain categories, some _d variables which are counts of variables which were earlier converted to percentages. Finally a1_all_docs_r was removed because it was found to have 0 variance later in modeling and produced singular matrices. Racial variables which were repeated in the test and demographic data were removed. 
 
 ```{r}
 #remove variables that are not predictive
@@ -722,7 +727,6 @@ plot(model.no_weights.all_vars)
 ## see rowid outlier
 Outlier 2384
 Imagine International Acadamey of North Texas
-Lots of Asians
 ```{r}
 sub_model_build['2384',]
 all_years['2384','DISTNAME']
@@ -843,7 +847,9 @@ for(j in 1:k){
   #k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-a1_all_d,-REGION.x,-REGION.y))
   k_fold_test <- subset(frame_split$train,subset=(folds==j),select=c(-a1_all_d,-REGION.y))
   #k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPSATOFC,-DPSTTOFC,-DPSCTOFP,-DPSSTOFP,-DPSUTOFP,-DPSTTOFP,-DPSETOFP,-DPSXTOFP,-DPSAMIFP,-DPSAKIDR,-DPSTKIDR,-DPST05FP,-DPSTEXPA,-DPSTBLFP,-DPSTHIFP,-DPSTWHFP,-DPSTO2FP,-DPSTREFP,-DPSTSPFP,-DPSTCOFP,-DPSTBIFP,-DPSTVOFP,-DPSTGOFP,-DPFRAALLT,-DPFRASTAP,-DZRVLOCP,-DPFRAFEDP,-DPFEAALLT, -DPFEAINST))
-  k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+  k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-a1_all_d,-REGION.x,-REGION.y,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST,-DPSATOFC,-train_ind))
+  #k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+  
   #k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-REGION.y))
   weights <- sqrt(frame_split$train[(folds!=j),c("a1_all_d")])
   best.fit =regsubsets(a1_all_rs**-1.39∼.,data=k_fold,nvmax =70,method=c('forward'),weights=weights)
@@ -876,13 +882,14 @@ trying with sqrt weights
 Minimum MSE is achieved at 30, but 20 looks just as good
 ```{r}
 #sub_model_build <- subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPSATOFC,-DPSTTOFC,-DPSCTOFP,-DPSSTOFP,-DPSUTOFP,-DPSTTOFP,-DPSETOFP,-DPSXTOFP,-DPSAMIFP,-DPSAKIDR,-DPSTKIDR,-DPST05FP,-DPSTEXPA,-DPSTBLFP,-DPSTHIFP,-DPSTWHFP,-DPSTO2FP,-DPSTREFP,-DPSTSPFP,-DPSTCOFP,-DPSTBIFP,-DPSTVOFP,-DPSTGOFP,-DPFRAALLT,-DPFRASTAP,-DZRVLOCP,-DPFRAFEDP,-DPFEAALLT, -DPFEAINST))
-sub_model_build.train <- subset(frame_split$train,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+sub_model_build.train <- subset(frame_split$train,select=c(-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST,-DPSATOFC,-train_ind))
 weights.train <- sqrt(frame_split$train[,c("a1_all_d")])
-sub_model_build.test <- subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+sub_model_build.test <- subset(frame_split$test,select=c(-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST,-DPSATOFC,-train_ind))
 weights.test <- sqrt(frame_split$test[,c("a1_all_d")])
 reg.best.train=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build.train, nvmax =70,method=c('forward'),weights=weights.train)
-coef(reg.best,42)
-select_var.weight.limit.sq <- names(coef(reg.best,42))[-1]
+coef(reg.best.train,37)
+start_coef <- coef(reg.best.train,37)
+select_var.weight.limit.sq <- names(coef(reg.best.train,42))[-1]
 ```
 
 ```{r}
@@ -917,6 +924,15 @@ plot(m3.limited.weights)
 plot(m3.limited.weights.test)
 ```
 
+```{r}
+pred.train.w_sq <- predict(m3.limited.weights, frame_split$train, weights=frame_split$train$a1_all_d)
+pred.test.w_sq <- predict(m3.limited.weights, frame_split$test, weights=frame_split$test$a1_all_d)
+pred.val.w_sq <- predict(m3.limited.weights, frame_split$validate, weights=frame_split$validate$a1_all_d)
+plot(frame_split$train$a1_all_rs,pred.train.w_sq**(-1/1.39),main='Actual vs Predicted',xlab='Acutal Train',ylab='Predicted Train')
+plot(frame_split$test$a1_all_rs,pred.test.w_sq**(-1/1.39),main='Actual vs Predicted',xlab='Acutal Test',ylab='Predicted Test')
+plot(frame_split$validate$a1_all_rs,pred.val.w_sq**(-1/1.39),main='Actual vs Predicted',xlab='Acutal Validation',ylab='Predicted Validation')
+```
+
 ##check one outlier
 This is Houston. It is humongous
 ```{r}
@@ -924,6 +940,7 @@ all_years['2667','DISTNAME']
 all_years['3486','DISTNAME']
 all_years['5641','DISTNAME']
 all_years['2641','DISTNAME']
+all_years['4642','DISTNAME']
 ```
 
 ### check for multicolinearity
@@ -974,10 +991,11 @@ cv.errors.m3.nsq =matrix (NA ,k,70, dimnames =list(NULL , paste (1:70) ))
 for(j in 1:k){
   #k_out <- (numeric_cols_sing_rm$k_indices != j)
   #k_in <- (numeric_cols_sing_rm$k_indices == j)
-  #k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-a1_all_d,-REGION.x,-REGION.y))
+  k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
   k_fold_test <- subset(frame_split$train,subset=(folds==j),select=c(-a1_all_d,-REGION.y))
   #k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPSATOFC,-DPSTTOFC,-DPSCTOFP,-DPSSTOFP,-DPSUTOFP,-DPSTTOFP,-DPSETOFP,-DPSXTOFP,-DPSAMIFP,-DPSAKIDR,-DPSTKIDR,-DPST05FP,-DPSTEXPA,-DPSTBLFP,-DPSTHIFP,-DPSTWHFP,-DPSTO2FP,-DPSTREFP,-DPSTSPFP,-DPSTCOFP,-DPSTBIFP,-DPSTVOFP,-DPSTGOFP,-DPFRAALLT,-DPFRASTAP,-DZRVLOCP,-DPFRAFEDP,-DPFEAALLT, -DPFEAINST))
-  k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+  #k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+  #k_fold_resp <- frame_split$train$a1_all_rs[folds!=j]
   #k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-REGION.y))
   weights <- frame_split$train[(folds!=j),c("a1_all_d")]
   best.fit =regsubsets(a1_all_rs**-1.39∼.,data=k_fold,nvmax =70,method=c('forward'),weights=weights)
@@ -1001,7 +1019,7 @@ Foward 63 w/o sqrt weights, but good at 12
 mean.cv.errors.limited.weights.nsq =apply(cv.errors.m3.nsq ,2, mean)
 mean.cv.errors.limited.weights.nsq
 plot(mean.cv.errors.limited.weights.nsq ,type='b')
-which(mean.cv.errors.limited.weights.nsq==min(mean.cv.errors.limited.weights))
+which(mean.cv.errors.limited.weights.nsq==min(mean.cv.errors.limited.weights.nsq))
 mean.cv.errors.limited.weights.nsq[which(mean.cv.errors.limited.weights.nsq==min(mean.cv.errors.limited.weights.nsq))]
 ```
 
@@ -1009,10 +1027,11 @@ Removed Extra econ variables for high vif
 trying with sqrt weights
 ```{r}
 #sub_model_build <- subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPSATOFC,-DPSTTOFC,-DPSCTOFP,-DPSSTOFP,-DPSUTOFP,-DPSTTOFP,-DPSETOFP,-DPSXTOFP,-DPSAMIFP,-DPSAKIDR,-DPSTKIDR,-DPST05FP,-DPSTEXPA,-DPSTBLFP,-DPSTHIFP,-DPSTWHFP,-DPSTO2FP,-DPSTREFP,-DPSTSPFP,-DPSTCOFP,-DPSTBIFP,-DPSTVOFP,-DPSTGOFP,-DPFRAALLT,-DPFRASTAP,-DZRVLOCP,-DPFRAFEDP,-DPFEAALLT, -DPFEAINST))
-sub_model_build <- subset(frame_split$train,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+sub_model_build <- subset(frame_split$train,select=c(-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
 weights <- frame_split$train[,c("a1_all_d")]
 reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('forward'),weights=weights)
 coef(reg.best,20)
+start_coef.weight.limit <- coef(reg.best,20)
 select_var.weight.limit <- names(coef(reg.best,20))[-1]
 ```
 
@@ -1046,6 +1065,7 @@ all_years['2667','DISTNAME']
 all_years['3486','DISTNAME']
 all_years['5641','DISTNAME']
 all_years['2641','DISTNAME']
+all_years['2392','DISTNAME']
 ```
 
 ## Check the limited variable model without weights and compare
@@ -1058,7 +1078,7 @@ for(j in 1:k){
   #k_in <- (numeric_cols_sing_rm$k_indices == j)
   #k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-a1_all_d,-REGION.x,-REGION.y))
   k_fold_test <- subset(frame_split$train,subset=(folds==j),select=c(-a1_all_d,-REGION.y))
-  k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+  k_fold <- subset(frame_split$train,subset=(folds!=j),select=c(-a1_all_d,-REGION.x,-REGION.y,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
   #k_fold_test <- subset(numeric_cols_sing_rm,subset=k_in,select=c(-k_indices,-train_ind,-REGION.y))
   #weights <- frame_split$train[(folds!=j),c("a1_all_d")]
   best.fit =regsubsets(a1_all_rs**-1.39∼.,data=k_fold,nvmax =70,method=c('seqrep'))
@@ -1089,12 +1109,12 @@ log not powerful enough what about sqrt
 or could box cox also work here?
 sqrt kinda works
 ```{r}
-sub_model_build <- subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+sub_model_build <- subset(frame_split$train,select=c(-a1_all_d,-REGION.x,-REGION.y,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
 
 weights <- sqrt(frame_split$test[,c("a1_all_d")])
 reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('seqrep'))
-coef(reg.best,17)
-select_var <- names(coef(reg.best,17))[-1]
+coef(reg.best,22)
+select_var <- names(coef(reg.best,22))[-1]
 ```
 
 Plopping in the weights takes care of the residuals but causes outliers
@@ -1102,6 +1122,8 @@ Plopping in the weights takes care of the residuals but causes outliers
 #select_var
 m4.noweights.limited <- lm(a1_all_rs**-1.39 ~ .
              ,data=sub_model_build[,c(select_var,'a1_all_rs')])
+m4.coef_names <- names(coef(m4.noweights.limited))[-1]
+m4.coef <- coef(m4.noweights.limited)
 #m_no_weights <- lm(a1_all_rs~.,data=sub_model_no_weights)
 ```
 
@@ -1127,7 +1149,7 @@ vif(m4.noweights.limited)
 boxcox on the weighted model with few parameters
 Box cox on all variables yielded an interval which contains 1 which suggests that only transformation of the the target is required. 
 ```{r}
-sub_model_build <- subset(frame_split$train,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+sub_model_build <- subset(frame_split$train,select=c(-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
 weights <- sqrt(frame_split$train[,c("a1_all_d")])
 reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('forward'),weights=weights)
 #coef(reg.best,20)
@@ -1183,9 +1205,38 @@ Also do MAE?
   mean( abs(frame_split$validate$a1_all_rs-pred.nsq**(-1/1.39)),na.rm = TRUE)
 ```
 
+## check correlation among school districts
 ```{r}
-```
+pred_all_m1 <- predict(m3.limited.weights ,numeric_cols_sing_rm)
+resid_all_m1 <- numeric_cols_sing_rm$a1_all_rs**(-1/1.39)-pred_all_m1
+res_all_m1 <- merge(resid_all_m1,all_years[,c('YEAR','DISTRICT')], all.x=TRUE, by='row.names')
+res_all_m1_14_15 <- merge(res_all_m1[res_all_m1$YEAR==14,],res_all_m1[res_all_m1$YEAR==15,],by='DISTRICT')
+res_all_m1_14_16 <- merge(res_all_m1_14_15,res_all_m1[res_all_m1$YEAR==16,],by='DISTRICT')
+res_all_m1_14_17 <- merge(res_all_m1_14_16,res_all_m1[res_all_m1$YEAR==17,],by='DISTRICT')
+resid_14_17 <- res_all_m1_14_17[,c(3,6,9,12)]
+colnames(resid_14_17) <- c('2014','2015','2016','2017')
+cor(resid_14_17)
+plot(resid_14_17)
+plot(res_all_m1_14_15$x.x, res_all_m1_14_15$x.y)
+cor(res_all_m1_14_15$x.x, res_all_m1_14_15$x.y,method='spearman')
+#var(resid_all_m1)
 
+plot(res_all_m1_14_16$x.x, res_all_m1_14_16$x.y)
+cor(res_all_m1_14_16$x.x, res_all_m1_14_16$x.y,method='spearman')
+
+plot(res_all_m1_14_17$x.x, res_all_m1_14_17$x.y)
+cor(res_all_m1_14_17$x.x, res_all_m1_14_17$x.y,method='spearman')
+```
+##check correlation in other models
+```{r}
+pred_all_m1 <- predict(model.weights.all_vars ,numeric_cols_sing_rm)
+resid_all_m1 <- numeric_cols_sing_rm$a1_all_rs-pred_all_m1**(-1/1.39)
+res_all_m1 <- merge(resid_all_m1,all_years[,c('YEAR','DISTRICT')], all.x=TRUE, by='row.names')
+res_all_m1_14_15 <- merge(res_all_m1[res_all_m1$YEAR==14,],res_all_m1[res_all_m1$YEAR==15,],by='DISTRICT')
+colnames(res_all_m1_14_15)
+plot(res_all_m1_14_15$x.x, res_all_m1_14_15$x.y)
+cor(res_all_m1_14_15$x.x, res_all_m1_14_15$x.y)
+```
 
 ## lasso model
 ## should try elastic net
@@ -1219,8 +1270,8 @@ mean( abs(frame_split$test$a1_all_rs-pred.lasso.test**(-1/1.39)))
 bestlam
 new.xx <- as.matrix(subset(frame_split$validate ,select=c(-k_indices,-train_ind,-a1_all_rs,-a1_all_d,-REGION.x,-REGION.y)))
 pred5 = predict(elastic_net, newx = new.xx, s=bestlam)
-mean( (frame_split$validate$a1_all_rs-pred5**(-1/1.39))^2)
-mean( abs(frame_split$validate$a1_all_rs-pred5**(-1/1.39)))
+mean( (frame_split$validate$a1_all_rs-pred5**(-1/1.39))^2, na.rm=TRUE)
+mean( abs(frame_split$validate$a1_all_rs-pred5**(-1/1.39)), na.rm=TRUE)
 ```
 
 ##box cox on the weights?
@@ -1261,6 +1312,13 @@ weights.val <- sqrt(frame_split$validate$a1_all_d)
 pred.lasso.validate.weights = predict(elastic_net, newx = new.xx, s=bestlam.weights,weights=weights.val)
 mean( (frame_split$validate$a1_all_rs-pred.lasso.validate.weights**(-1/1.39))^2,na.rm = TRUE)
 mean( abs(frame_split$validate$a1_all_rs-pred.lasso.validate.weights**(-1/1.39)),na.rm = TRUE)
+```
+
+#predicted vs actual
+```{r}
+plot(frame_split$train$a1_all_rs,pred.lasso.train.weights**(-1/1.39),main='Actual vs Predicted',xlab='Acutal Train',ylab='Predicted Train')
+plot(frame_split$test$a1_all_rs,pred.lasso.test.weights**(-1/1.39),main='Actual vs Predicted',xlab='Acutal Test',ylab='Predicted Test')
+plot(frame_split$validate$a1_all_rs,pred.lasso.validate.weights**(-1/1.39),main='Actual vs Predicted',xlab='Acutal Validation',ylab='Predicted Validation')
 ```
 
 ## can I test multicolinearity with lasso
@@ -1310,6 +1368,25 @@ plot(frame_split$validate$a1_all_rs,pred.lasso.validate.weights**(1/-1.39))
 
 ##plot error/residuals vs predictors
 ```{r}
+```
+
+##plot years residuals
+```{r, eval=FALSE}
+new.xx <- as.matrix(numeric_cols_sing_rm[,rownames(coef(elastic_net))[2:104]])
+weights.val <- sqrt(numeric_cols_sing_rm$a1_all_d)
+#weights.val <- frame_split$validate$a1_all_d**-.1818
+pred.all_lasso_weights = predict(elastic_net, newx = new.xx, s=bestlam.weights,weights=weights.val)
+resid_all_m1 <- numeric_cols_sing_rm$a1_all_rs-pred.all_lasso_weights**(-1/1.39)
+res_all_m1 <- merge(resid_all_m1,all_years[,c('YEAR','DISTRICT')], all.x=TRUE, by='row.names')
+res_all_m1_14_15 <- merge(res_all_m1[res_all_m1$YEAR==14,],res_all_m1[res_all_m1$YEAR==15,],by='DISTRICT')
+plot(res_all_m1_14_15[,'1.x'], res_all_m1_14_15[,'1.y'])
+cor(res_all_m1_14_15[,'1.x'], res_all_m1_14_15[,'1.y'],method='spearman')
+res_all_m1_14_16 <- merge(res_all_m1[res_all_m1$YEAR==14,],res_all_m1[res_all_m1$YEAR==16,],by='DISTRICT')
+plot(res_all_m1_14_16$x.x, res_all_m1_14_16$x.y)
+cor(res_all_m1_14_16$x.x, res_all_m1_14_16$x.y,method='spearman')
+res_all_m1_14_17 <- merge(res_all_m1[res_all_m1$YEAR==14,],res_all_m1[res_all_m1$YEAR==17,],by='DISTRICT')
+plot(res_all_m1_14_17$x.x, res_all_m1_14_17$x.y)
+cor(res_all_m1_14_17$x.x, res_all_m1_14_17$x.y,method='spearman')
 ```
 
 Trying with weights first
@@ -1371,7 +1448,7 @@ library(randomForest)
 
 X <- as.matrix(subset(frame_split$train,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y)))
 
-rf1 <- randomForest(a1_all_rs~.,data=X, ntree=100)
+rf1 <- randomForest(frame_split$train$a1_all_rs~.,data=X, ntree=100)
 
 ```
 
@@ -1506,6 +1583,25 @@ Also do MAE?
   final.comp
 ```
 
+#compute R-squared
+```{r}
+y_bar_val <- mean(frame_split$validate$a1_all_rs)
+y_bar_test <- mean(frame_split$test$a1_all_rs)
+r_s <- function(actual, pred, y_bar=y_bar_val){
+  ss_tot <- sum((actual-y_bar)**2)
+  ss_res <- sum((actual-pred)**2)
+  ss_reg <- sum((pred-y_bar)**2)
+  #return(1-ss_res/ss_tot)
+  return(ss_reg/ss_tot)
+}
+#mse.val[3] <- mean( (frame_split$validate$a1_all_rs-pred3**(-1/1.39))^2,na.rm = TRUE)
+r_s(frame_split$validate$a1_all_rs,pred3**(-1/1.39))
+r_s(frame_split$test$a1_all_rs,pred3**(-1/1.39),y_bar=y_bar_test)
+r_s(frame_split$validate$a1_all_rs,pred5**(-1/1.39))
+r_s(frame_split$test$a1_all_rs,pred5**(-1/1.39),y_bar=y_bar_test)
+
+```
+
 #compare residuals vs fitted
 
 #compare predicted vs acutal
@@ -1521,6 +1617,539 @@ lines(density(frame_split$test$a1_all_rs-pred3.test),col=2)
 lines(density(frame_split$validate$a1_all_rs-pred3.validate),col=3)
 ```
 
-#compare mse
+## compare mse
+
+## time series remove correlation between schools
+```{r}
+set.seed(1011)
+# break schools into 60/20/20
+
+# pick schools from 2014
+districts <- merge(numeric_cols_sing_rm,all_years$DISTRICT, all.x=TRUE, by='row.names')
+head(districts[,c('YEAR','y')])
+districts <- districts[order(districts$y,districts$YEAR),]
+head(districts[,c('YEAR','y')])
+
+# sort data by year and district
+
+#not all districts have 4 years of data 
+districts %>% group_by(districts$YEAR) %>% summarise(n= n())
+
+#find districts with 4 years of data
+dist_w_n <- districts %>% group_by(districts$y) %>% summarise(n= n())
+
+#filter on districts with 4 years of data
+dist4_years <- data.frame(dist_w_n[(dist_w_n$n ==4),])
+
+#removed 170 year/schools for not having 4 years of data
+districts4_years <- merge(districts, dist4_years, by.x = c('y'), by.y = c('districts.y'), all=FALSE)
+
+#print result of fitler
+districts4_years %>% group_by(districts4_years$YEAR) %>% summarise(n= n())
+
+#split data into train and test 
+dist_r_order <- sample(dist4_years$districts.y,size=nrow(dist4_years))
+
+#split 60/20/20
+districts4_years.train <- merge(districts, data.frame(y=dist_r_order[1:627]), by.x = c('y'), by.y = c('y'), all=FALSE)
+districts4_years.test <- merge(districts, data.frame(y=dist_r_order[628:833]), by.x = c('y'), by.y = c('y'), all=FALSE)
+districts4_years.val <- merge(districts, data.frame(y=dist_r_order[834:1041]), by.x = c('y'), by.y = c('y'), all=FALSE)
+
+#add an intercept
+#X.train <- as.matrix(cbind(intercept=rep(1,nrow(districts4_years.train)), #districts4_years.train[,c(m4.coef_names)]))
+y.train <- districts4_years.train$a1_all_rs**(-1.39)
+```
+
+```{r}
+#start_coef
+#select_var.weight.limit.sq
+beta.coef <- m4.coef
+sigma_e <- var(m4.noweights.limited$residuals)
+rho.start <- .6
+
+param <- c( rho.start,sigma_e,beta.coef)
+mle.1 <- function(param){
+  rho <- param[1]
+  s_e <- param[2]
+  beta.coef <- param[3:length(param)]
+  n <- nrow(X.train)
+  cor_mat <- s_e*matrix(c(1,rho, rho**2, rho**3,
+             rho,1, rho, rho**2,
+             rho**2,rho, 1, rho,
+             rho**3,rho**2, rho**1, 1),nrow=4)
+  inv.cor_mat <- solve(cor_mat)
+  S1 <- matrix(0, nrow=n,ncol=n)
+  S2 <- matrix(0, nrow=n,ncol=n)
+  for (i in seq(1,n, by=4)){
+  S1[i:(i+3), i:(i+3)] <- cor_mat
+  S2[i:(i+3), i:(i+3)] <- inv.cor_mat
+  }
+  -1*(-n*log(2*pi)-log(det(S1)+1)-1/2*t(y.train - X.train%*%beta.coef)%*%S2%*%(y.train - X.train%*%beta.coef))
+}
+ini=c( rho.start,sigma_e,beta.coef)
+fit.mle1=nlm(mle.1, ini,print.level=1,stepmax=10, iterlim=100)
 
 
+
+
+#construct convariance matrix
+# make up a p based on the correlation I saw 
+```
+#fit models
+consider removing sex male for multicolinearity, also it does not make sense as predictor
+```{r}
+X.train <- as.matrix(cbind(intercept=rep(1,nrow(districts4_years.train)), districts4_years.train[,c(m4.coef_names)]))
+y.train <- districts4_years.train$a1_all_rs**(-1.39)
+
+#cor(res_all_m1_14_15$x.x, res_all_m1_14_15$x.y,method='spearman')
+#values I tried ; 0.7697, 0.6, 0.4
+p <- 0.58
+sig_e <- 1.798800e-09
+
+cor_mat <- sig_e * matrix(c(1,       p-.3,    p**2,    p**3+.2,
+                            p-.3,    1,       p-.2,    p**2+.1,
+                            p**2,    p-.2,    1,       p,
+                            p**3+.2,p**2+.1, p,    1),nrow=4)
+inv_cor_mat <- solve(chol(cor_mat))
+sigma_big <- matrix(0, nrow=nrow(X.train),ncol=nrow(X.train))
+for (i in seq(1,nrow(X.train), by=4)){
+sigma_big[i:(i+3), i:(i+3)] <- inv_cor_mat
+}
+
+# try without running log likelihood
+
+y_star <- sigma_big%*%(y.train)
+#districts4_years
+x_star <- sigma_big%*%X.train[,-c(2,3,4,6,11,13)]
+x_star1 <- sigma_big%*%X.train
+
+lm_gls_kinda <- lm(y_star~x_star-1)
+#summary(lm_gls_kinda)
+#plot(lm_gls_kinda)
+#m3.limited.weights.nsq$residuals
+
+lm_gls_kinda.weights <- lm(y_star~x_star-1, weights = districts4_years.train$a1_all_d)
+summary(lm_gls_kinda.weights)
+plot(lm_gls_kinda.weights)
+#m3.limited.weights.nsq$residuals
+
+#predict()
+
+years_res <- matrix(0, nrow(X.train)/4, 4)
+for (i in seq(0,nrow(X.train)/4-1)){
+  years_res[i,] <- lm_gls_kinda$residuals[(i*4+1):(i*4+4)]
+}
+
+cor(years_res)
+```
+
+#print outlier
+```{r}
+all_years['1119',c('DISTNAME','DNAME','DISTRICT')]
+all_years[all_years$DISTRICT==4901,]
+```
+
+# Vif on predictors
+```{r}
+#cor(X_train)
+#cor(x_star1)
+cor(x_star)
+#vif(lm_gls_kinda)
+```
+
+```{r}
+years_res <- matrix(0, nrow(X.train)/4, 4)
+for (i in seq(0,nrow(X.train)/4-1)){
+  years_res[i,] <- lm_gls_kinda$residuals[(i*4+1):(i*4+4)]
+}
+#plot(years_res[,1],years_res[,2])
+#cor(years_res[,1],years_res[,2])
+#plot(years_res[,1],years_res[,3])
+#cor(years_res[,1],years_res[,3])
+#plot(years_res[,1],years_res[,4])
+#cor(years_res[,1],years_res[,4])
+
+cor(years_res)
+years_res_df <- data.frame(years_res)
+colnames(years_res_df) <- c('2014','2015','2016','2017')
+plot(years_res_df)
+
+```
+
+#why are there 4 groups in the residuals?
+
+#prediction vs actual
+
+
+#test on training data
+```{r}
+X.test <- as.matrix(cbind(intercept=rep(1,nrow(districts4_years.test)), districts4_years.test[,c(m4.coef_names)]))
+y.test <- districts4_years.test$a1_all_rs**(-1.39)
+
+sigma_big.test <- matrix(0, nrow=nrow(X.test),ncol=nrow(X.test))
+sigma_big.test.norm <- matrix(0, nrow=nrow(X.test),ncol=nrow(X.test))
+#chol(cor_mat)
+for (i in seq(1,nrow(X.test), by=4)){
+sigma_big.test[i:(i+3), i:(i+3)] <- inv_cor_mat
+sigma_big.test.norm[i:(i+3), i:(i+3)] <- chol(cor_mat)
+}
+
+# try without running log likelihood
+
+y_star <- sigma_big.test%*%(y.test)
+#districts4_years
+x_star <- sigma_big.test%*%X.test[,-c(2,3,4,6,11,13)]
+
+y_star.pred.test <- predict(lm_gls_kinda.weights,data.frame(x_star),weights=districts4_years.test$a1_all_d)
+
+plot(y_star, y_star.pred.test)
+
+y_pred_test_orig_scale <- (sigma_big.test.norm %*% y_star.pred.test)**(-1/1.39)
+plot(districts4_years.test$a1_all_rs, y_pred_test_orig_scale)
+
+#test R-squared
+
+```
+#test on validation data
+```{r}
+X.val <- as.matrix(cbind(intercept=rep(1,nrow(districts4_years.val)), districts4_years.val[,c(m4.coef_names)]))
+y.val <- districts4_years.val$a1_all_rs**(-1.39)
+
+sigma_big.val <- matrix(0, nrow=nrow(X.val),ncol=nrow(X.val))
+sigma_big.val.norm <- matrix(0, nrow=nrow(X.val),ncol=nrow(X.val))
+#chol(cor_mat)
+for (i in seq(1,nrow(X.val), by=4)){
+sigma_big.val[i:(i+3), i:(i+3)] <- inv_cor_mat
+sigma_big.val.norm[i:(i+3), i:(i+3)] <- chol(cor_mat)
+}
+
+# try without running log likelihood
+
+y_star <- sigma_big.val%*%(y.val)
+#districts4_years
+x_star <- sigma_big.val%*%X.val[,-c(2,3,4,6,11,13)]
+
+y_star.pred.val <- predict(lm_gls_kinda.weights,data.frame(x_star),weights=districts4_years.val$a1_all_d)
+
+plot(y_star, y_star.pred.val)
+
+y_pred_val_orig_scale <- (sigma_big.val.norm %*% y_star.pred.val)**(-1/1.39)
+plot(districts4_years.val$a1_all_rs, y_pred_val_orig_scale)
+
+#test R-squared
+```
+
+#MLE with only 2 variables year and prior math score, but more parameters in the variance
+```{r}
+X.train <- as.matrix(cbind(intercept=rep(1,nrow(districts4_years.train)), districts4_years.train[,c('m_all_rs')]))
+y.train <- districts4_years.train$a1_all_rs**(-1.39)
+
+pre_model <- lm(y.train~X.train-1)
+
+
+beta.coef <- coef(pre_model)
+sigma_e <- var(pre_model$residuals)
+rho.start <- .6
+
+param <- c(.28, .34,.39,.38,.43, .58,sigma_e,beta.coef)
+mle.1 <- function(param){
+  p_12 <- param[1]
+  p_13 <- param[2]
+  p_14 <- param[3]
+  p_23 <- param[4]
+  p_24 <- param[5]
+  p_34 <- param[6]
+  #rho <- param[1]
+  s_e <- param[7]
+  beta.coef <- param[8:length(param)]
+  n <- nrow(X.train)
+  cor_mat <- s_e*matrix(c(1,p_12, p_13, p_14,
+                        p_12,1, p_23, p_24,
+                        p_13,p_23, 1, p_34,
+                        p_14,p_24, p_34, 1),nrow=4)
+  inv.cor_mat <- solve(cor_mat)
+  S1 <- matrix(0, nrow=n,ncol=n)
+  S2 <- matrix(0, nrow=n,ncol=n)
+  for (i in seq(1,n, by=4)){
+  S1[i:(i+3), i:(i+3)] <- cor_mat
+  S2[i:(i+3), i:(i+3)] <- inv.cor_mat
+  }
+  -1*(-n*log(2*pi)-log(det(S1))-1/2*t(y.train - X.train%*%beta.coef)%*%S2%*%(y.train - X.train%*%beta.coef))
+}
+ini=c( .28, .34,.39,.38,.43, .58,sigma_e,beta.coef)
+ini=c()
+fit.mle1=nlm(mle.1, ini,print.level=1,stepmax=10, iterlim=100)
+```
+#lasso with the transformed regression ? 
+```{r}
+X.train <- as.matrix(districts4_years.train[,c(6, 7,8,11:112)])
+y.train <- districts4_years.train$a1_all_rs**(-1.39)
+
+p <- 0.58
+sig_e <- 1.798800e-09
+
+cor_mat <- sig_e * matrix(c(1,       p-.3,    p**2,    p**3+.2,
+                            p-.3,    1,       p-.2,    p**2+.1,
+                            p**2,    p-.2,    1,       p,
+                            p**3+.2,p**2+.1, p,    1),nrow=4)
+inv_cor_mat <- solve(chol(cor_mat))
+sigma_big <- matrix(0, nrow=nrow(X.train),ncol=nrow(X.train))
+sigma_big_norm <- matrix(0, nrow=nrow(X.train),ncol=nrow(X.train))
+for (i in seq(1,nrow(X.train), by=4)){
+sigma_big[i:(i+3), i:(i+3)] <- inv_cor_mat
+sigma_big_norm[i:(i+3), i:(i+3)] <- chol(cor_mat)
+}
+
+# try without running log likelihood
+
+y_star <- sigma_big%*%(y.train)
+#districts4_years
+#x_star <- sigma_big%*%X.train[,-c(2,3,4,6,11,13)]
+x_star <- sigma_big%*%X.train
+```
+```{r}
+data.frame(matrix(c(1,       p-.3,    p**2,    p**3+.2,
+                            p-.3,    1,       p-.2,    p**2+.1,
+                            p**2,    p-.2,    1,       p,
+                            p**3+.2,p**2+.1, p,    1),nrow=4))
+```
+
+## select model with BIC
+```{r}
+X.train <- as.matrix(districts4_years.train[,c(6, 7,8,11:112)])
+y.train <- districts4_years.train$a1_all_rs**(-1.39)
+y_star <- sigma_big%*%(y.train)
+x_star <- data.frame(sigma_big%*%X.train)
+regfit.full =regsubsets(y_star∼.,data=x_star,nvmax =70,method=c('seqrep'),weights=districts4_years.train$a1_all_d)
+reg.summary=(summary(regfit.full))
+plot(reg.summary$bic ,xlab =" Number of Variables ",
+     ylab=" BIC",type="l",main='Number of Variables in Model by BIC')
+abline(v=40,col='red')
+text(40,-12000,paste('Miniumum BIC:',round(reg.summary$bic[which.min(reg.summary$bic)],digits=2)))
+which.min(reg.summary$bic)
+reg.summary$bic[which.min(reg.summary$bic)]
+```
+
+#subset variables removed
+Seq - 11910
+Forward - 11888, 11878
+```{r}
+X.train <- as.matrix(districts4_years.train[,c(6, 7,8,11:112)])
+y.train <- districts4_years.train$a1_all_rs**(-1.39)
+y_star <- sigma_big%*%(y.train)
+x_star <- subset(data.frame(sigma_big%*%X.train),select=c(-m_all_rs,-w_all_rs,-r_all_rs,-DPSTTOFC,
+-DPSTTOFP,-DPSXTOFP,-DPSSTOSA,-DPSUTOSA,-DPSAMIFP,-DPFEAOPFK,-DPFEAINST,-a1_sexm_d_pct,
+-a1_sexf_d_pct,-a1_lepc_d_pct,-a1_lepf_d_pct,-DPFRASTAP,-DPFRAALLK,
+-DZRVLOCP,-DPSATOFC,-DPSCTOSA,-DPFRAALLT,-a1_lep0_d_pct,-DPSTEXPA,-DPFTADPR,
+-a1_leps_d_pct,-DPFPAREGP,-DPSTREFP,-DPSAKIDR,-a1_ti10_d_pct,-a1_ti16_d_pct
+,-DPSTTOSA,-DPSTKIDR,-DPSTHIFP,-DPSTWHFP,-DPFEAALLT,-DPFEAOPFT,-DPFEAINSP,-DZEXADSP,-DZEXPLAP,-DZEXOTHP,-DPFEAINSK,-TAXRATENUM,-a1_eco1_d_pct))
+regfit.full =regsubsets(y_star∼.,data=x_star,nvmax =70,method=c('seqrep'),weights=districts4_years.train$a1_all_d)
+reg.summary=(summary(regfit.full))
+plot(reg.summary$bic ,xlab =" Number of Variables ",
+     ylab=" BIC",type="l",main='Number of Variables in Model by BIC')
+abline(v=which.min(reg.summary$bic),col='red')
+text(which.min(reg.summary$bic),-10000,paste('Miniumum BIC:',round(reg.summary$bic[which.min(reg.summary$bic)],digits=2)))
+which.min(reg.summary$bic)
+reg.summary$bic[which.min(reg.summary$bic)]
+```
+
+```{r}
+#plot(regfit.full)
+#coef(regfit.full,41)
+#select_var
+gls.bic <- lm(y_star ~ .,data=x_star[,c(names(coef(regfit.full,40))[-1])],weights=districts4_years.train$a1_all_d)
+#m_no_weights <- lm(a1_all_rs~.,data=sub_model_no_weights)
+summary(gls.bic )
+plot(gls.bic)
+```
+
+##run best linear model 
+```{r}
+gls.bic2 <- lm(y_star ~ .,data=x_star[,c(names(coef(regfit.full,40))[-c(1,2,3,5,6,9,10,13,14,15,17:20,26,30)])],weights=districts4_years.train$a1_all_d)
+#m_no_weights <- lm(a1_all_rs~.,data=sub_model_no_weights)
+summary(gls.bic2)
+plot(gls.bic2)
+```
+
+#run with just old math scores
+```{r}
+X_math <- data.frame(m_all_rs=sigma_big%*%X.train[,'m_all_rs'])
+gls.bic4 <- lm(y_star ~ .,data=X_math,weights=districts4_years.train$a1_all_d)
+#m_no_weights <- lm(a1_all_rs~.,data=sub_model_no_weights)
+summary(gls.bic4)
+plot(gls.bic4)
+data.frame(vif(gls.bic4))
+```
+
+##run best linear model 
+```{r}
+sel_nm <- c('DPSUTOFP','DPSTURNR','DPSTBLFP','DPSTO2FP','DPFRAFEDP','DPFUNAB1T','DPFUNA4T','DPFPACOMP','DPFPABILP','DPFPREKP','DPFPAOTHP','a1_ethh_d_pct','a1_ethi_d_pct','a1_etha_d_pct','a1_ethb_d_pct','a1_ethw_d_pct','a1_eth2_d_pct','a1_eco2_d_pct','a1_ti17_d_pct','a1_migy_d_pct','a1_bil2_d_pct','a1_esl2_d_pct','a1_esl3_d_pct','a1_gify_d_pct','a1_atry_d_pct','a1_voc2_d_pct')
+#gls.bic3 <- lm(y_star ~ .,data=x_star[,c(names(coef(regfit.full,26))[-1])],weights=districts4_years.train$a1_all_d)
+gls.bic3 <- lm(y_star ~ .,data=x_star[,sel_nm],weights=districts4_years.train$a1_all_d)
+#m_no_weights <- lm(a1_all_rs~.,data=sub_model_no_weights)
+summary(gls.bic3)
+plot(gls.bic3)
+data.frame(vif(gls.bic3))
+```
+
+#check for correlation among predictors
+```{r}
+data.frame(vif(gls.bic))
+```
+
+```{r}
+data.frame(vif(gls.bic2))
+```
+
+```{r}
+data.frame(vif(gls.bic3))
+```
+
+## marginal model plots
+```{r}
+for (nm in names(coef(gls.bic3))[-1]){
+  plot(x_star[,nm],gls.bic3$residuals,xlab=nm)
+}
+```
+
+#check correlations
+```{r}
+years_res <- matrix(0, nrow(X.train)/4, 4)
+for (i in seq(0,nrow(X.train)/4-1)){
+  years_res[i,] <- gls.bic3$residuals[(i*4+1):(i*4+4)]
+}
+cor(years_res_df)
+colnames(years_res_df) <- c('2014','2015','2016','2017')
+plot(years_res_df)
+```
+
+#transform coefficients back
+```{r}
+coef(gls.bic3)
+-1*sign(coef(gls.bic3))*abs(coef(gls.bic3))**(-1/1.39)
+```
+
+#plot predictions
+```{r}
+y_star.train <- sigma_big%*%(y.train)
+y_star.pred.train<-(sigma_big_norm %*% gls.bic3$fitted.values)**(-1/1.39)
+y_star.pred.train_math<-(sigma_big_norm %*% gls.bic4$fitted.values)**(-1/1.39)
+
+#X.train <- as.matrix(districts4_years.train[,c(6, 7,8,11:112)])
+#y.train <- districts4_years.train$a1_all_rs**(-1.39)
+
+
+X.test <- as.matrix(districts4_years.test[,c(6, 7,8,11:112)])
+y.test <- districts4_years.test$a1_all_rs**(-1.39)
+
+sigma_big.test <- matrix(0, nrow=nrow(X.test),ncol=nrow(X.test))
+sigma_big.test.norm <- matrix(0, nrow=nrow(X.test),ncol=nrow(X.test))
+#chol(cor_mat)
+for (i in seq(1,nrow(X.test), by=4)){
+sigma_big.test[i:(i+3), i:(i+3)] <- inv_cor_mat
+sigma_big.test.norm[i:(i+3), i:(i+3)] <- chol(cor_mat)
+}
+
+# try without running log likelihood
+
+y_star.test <- sigma_big.test%*%(y.test)
+#districts4_years
+x_star <- sigma_big.test%*%X.test[,-c(2,3,4,6,11,13)]
+
+y_star.pred.test <- predict(gls.bic3,data.frame(x_star),weights=districts4_years.test$a1_all_d)
+y_star.pred.test_math <- predict(gls.bic4,data.frame(x_star),weights=districts4_years.test$a1_all_d)
+
+y_pred_test_orig_scale <- (sigma_big.test.norm %*% y_star.pred.test)**(-1/1.39)
+y_pred_test_orig_scale_math <- (sigma_big.test.norm %*% y_star.pred.test_math)**(-1/1.39)
+
+X.val <- as.matrix(districts4_years.val[,c(6, 7,8,11:112)])
+y.val <- districts4_years.val$a1_all_rs**(-1.39)
+
+sigma_big.val <- matrix(0, nrow=nrow(X.val),ncol=nrow(X.val))
+sigma_big.val.norm <- matrix(0, nrow=nrow(X.val),ncol=nrow(X.val))
+#chol(cor_mat)
+for (i in seq(1,nrow(X.val), by=4)){
+sigma_big.val[i:(i+3), i:(i+3)] <- inv_cor_mat
+sigma_big.val.norm[i:(i+3), i:(i+3)] <- chol(cor_mat)
+}
+
+# try without running log likelihood
+
+y_star.val <- sigma_big.val%*%(y.val)
+#districts4_years
+x_star <- sigma_big.val%*%X.val[,-c(2,3,4,6,11,13)]
+
+y_star.pred.val <- predict(gls.bic3,data.frame(x_star),weights=districts4_years.val$a1_all_d)
+y_pred_val_orig_scale <- (sigma_big.val.norm %*% y_star.pred.val)**(-1/1.39)
+
+y_star.pred.val_math <- predict(gls.bic4,data.frame(x_star),weights=districts4_years.val$a1_all_d)
+y_pred_val_orig_scale_math <- (sigma_big.val.norm %*% y_star.pred.val_math)**(-1/1.39)
+
+
+
+plot(y_star.train,gls.bic3$fitted.values, main='Train Predicted',xlab='Actual Transformed Scale',ylab='Predicted Transformed Scale')
+plot(districts4_years.train$a1_all_rs,y_star.pred.train, main='Train Original Scale',xlab='Actual Original Scale',ylab='Predicted Original Scale')
+
+plot(y_star.test, y_star.pred.test, main='Test Predicted',xlab='Actual Transformed Scale',ylab='Predicted Transformed Scale')
+plot(districts4_years.test$a1_all_rs, y_pred_test_orig_scale, main='Test Original Scale',xlab='Actual Original Scale',ylab='Predicted Original Scale')
+
+plot(y_star.val, y_star.pred.val, main='Validation Predicted',xlab='Actual Transformed Scale',ylab='Predicted Transformed Scale')
+plot(districts4_years.val$a1_all_rs, y_pred_val_orig_scale, main='Validation Original Scale',xlab='Actual Original Scale',ylab='Predicted Original Scale')
+```
+
+## Outliers
+```{r}
+which((y_star.pred.train-districts4_years.train$a1_all_rs)==max(y_star.pred.train-districts4_years.train$a1_all_rs))
+districts4_years.test[458,c('YEAR','Row.names')]
+all_years['4972',c('YEAR','DISTNAME','a1_all_d',sel_nm)]
+which((y_pred_test_orig_scale-districts4_years.test$a1_all_rs)==max(y_pred_test_orig_scale-districts4_years.test$a1_all_rs))
+districts4_years.train[183,c('YEAR','Row.names')]
+write.csv(all_years['3387',c('YEAR','DISTNAME','a1_all_d',sel_nm)],"E:/STAT685/train_outlier.csv")
+```
+
+## Errors
+In original or different scale?
+```{r}
+#in original scale
+sqrt(mean((districts4_years.train$a1_all_rs-y_star.pred.train)**2))
+mean(abs(districts4_years.train$a1_all_rs-y_star.pred.train))
+sqrt(mean((districts4_years.test$a1_all_rs - y_pred_test_orig_scale)**2))
+mean(abs(districts4_years.test$a1_all_rs - y_pred_test_orig_scale))
+sqrt(mean((districts4_years.val$a1_all_rs- y_pred_val_orig_scale)**2))
+mean(abs(districts4_years.val$a1_all_rs- y_pred_val_orig_scale))
+```
+
+##For just math
+```{r}
+sqrt(mean((districts4_years.train$a1_all_rs-y_star.pred.train_math)**2))
+mean(abs(districts4_years.train$a1_all_rs-y_star.pred.train_math))
+sqrt(mean((districts4_years.test$a1_all_rs - y_pred_test_orig_scale_math)**2))
+mean(abs(districts4_years.test$a1_all_rs - y_pred_test_orig_scale_math))
+sqrt(mean((districts4_years.val$a1_all_rs- y_pred_val_orig_scale_math)**2))
+mean(abs(districts4_years.val$a1_all_rs- y_pred_val_orig_scale_math))
+```
+
+Removed Extra econ variables for high vif
+trying with sqrt weights
+```{r}
+#sub_model_build <- subset(frame_split$test,select=c(-k_indices,-train_ind,-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPSATOFC,-DPSTTOFC,-DPSCTOFP,-DPSSTOFP,-DPSUTOFP,-DPSTTOFP,-DPSETOFP,-DPSXTOFP,-DPSAMIFP,-DPSAKIDR,-DPSTKIDR,-DPST05FP,-DPSTEXPA,-DPSTBLFP,-DPSTHIFP,-DPSTWHFP,-DPSTO2FP,-DPSTREFP,-DPSTSPFP,-DPSTCOFP,-DPSTBIFP,-DPSTVOFP,-DPSTGOFP,-DPFRAALLT,-DPFRASTAP,-DZRVLOCP,-DPFRAFEDP,-DPFEAALLT, -DPFEAINST))
+sub_model_build <- subset(frame_split$train,select=c(-a1_all_d,-REGION.x,-REGION.y,-r_all_rs,-w_all_rs,-DPFEAALLT,-DPFEAOPFT,-DPFRAALLT,-DPSTTOFC,-DPFEAINST))
+weights <- frame_split$train[,c("a1_all_d")]
+reg.best=regsubsets (a1_all_rs**-1.39∼.,data=sub_model_build , nvmax =70,method=c('forward'),weights=weights)
+coef(reg.best,20)
+start_coef.weight.limit <- coef(reg.best,20)
+select_var.weight.limit <- names(coef(reg.best,20))[-1]
+```
+
+```{r}
+#select_var
+m3.limited.weights.nsq <- lm(a1_all_rs**-1.39 ~ .
+             ,data=sub_model_build[,c(select_var.weight.limit,'a1_all_rs')],weights=weights)
+#m_no_weights <- lm(a1_all_rs~.,data=sub_model_no_weights)
+summary(m3.limited.weights.nsq)
+```
+
+#scratch
+```{r}
+all_years[all_years$DNAME=='DALLAS ISD',c('YEAR','DNAME','a1_all_rs')]
+```
