@@ -1660,7 +1660,7 @@ districts4_years.val <- merge(districts, data.frame(y=dist_r_order[834:1041]), b
 y.train <- districts4_years.train$a1_all_rs**(-1.39)
 ```
 
-```{r}
+```{r, eval=FALSE}
 #start_coef
 #select_var.weight.limit.sq
 beta.coef <- m4.coef
@@ -1712,8 +1712,10 @@ cor_mat <- sig_e * matrix(c(1,       p-.3,    p**2,    p**3+.2,
                             p**3+.2,p**2+.1, p,    1),nrow=4)
 inv_cor_mat <- solve(chol(cor_mat))
 sigma_big <- matrix(0, nrow=nrow(X.train),ncol=nrow(X.train))
+sigma_big2 <- matrix(0, nrow=nrow(X.train),ncol=nrow(X.train))
 for (i in seq(1,nrow(X.train), by=4)){
 sigma_big[i:(i+3), i:(i+3)] <- inv_cor_mat
+sigma_big2[i:(i+3), i:(i+3)] <- cor_mat
 }
 
 # try without running log likelihood
@@ -1753,7 +1755,7 @@ all_years[all_years$DISTRICT==4901,]
 ```{r}
 #cor(X_train)
 #cor(x_star1)
-cor(x_star)
+cor(x_star1)
 #vif(lm_gls_kinda)
 ```
 
@@ -1984,12 +1986,14 @@ data.frame(vif(gls.bic4))
 ##run best linear model 
 ```{r}
 sel_nm <- c('DPSUTOFP','DPSTURNR','DPSTBLFP','DPSTO2FP','DPFRAFEDP','DPFUNAB1T','DPFUNA4T','DPFPACOMP','DPFPABILP','DPFPREKP','DPFPAOTHP','a1_ethh_d_pct','a1_ethi_d_pct','a1_etha_d_pct','a1_ethb_d_pct','a1_ethw_d_pct','a1_eth2_d_pct','a1_eco2_d_pct','a1_ti17_d_pct','a1_migy_d_pct','a1_bil2_d_pct','a1_esl2_d_pct','a1_esl3_d_pct','a1_gify_d_pct','a1_atry_d_pct','a1_voc2_d_pct')
+#sel_nm <- c('DPSUTOFP','DPSTURNR','DPSTBLFP','DPSTO2FP','DPFRAFEDP','DPFUNAB1T','DPFUNA4T','DPFPACOMP','DPFPABILP','DPFPREKP','DPFPAOTHP','a1_ethi_d_pct','a1_etha_d_pct','a1_ethb_d_pct','a1_ethw_d_pct','a1_eth2_d_pct','a1_eco2_d_pct','a1_ti17_d_pct','a1_migy_d_pct','a1_bil2_d_pct','a1_esl2_d_pct','a1_esl3_d_pct','a1_gify_d_pct','a1_atry_d_pct','a1_voc2_d_pct')
 #gls.bic3 <- lm(y_star ~ .,data=x_star[,c(names(coef(regfit.full,26))[-1])],weights=districts4_years.train$a1_all_d)
 gls.bic3 <- lm(y_star ~ .,data=x_star[,sel_nm],weights=districts4_years.train$a1_all_d)
 #m_no_weights <- lm(a1_all_rs~.,data=sub_model_no_weights)
 summary(gls.bic3)
 plot(gls.bic3)
 data.frame(vif(gls.bic3))
+vif(gls.bic3)
 ```
 
 #check for correlation among predictors
